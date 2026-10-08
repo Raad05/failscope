@@ -1,0 +1,20 @@
+{
+  "signature": "5HWjSnLZGdCNWW6sHeSzG6FBXnTVbZfTzjdsTmC6n73zLJ8y9vRQXfZePfxN9RjsdG7TAb1Sh43fPjq2QKKoFfVE",
+  "cluster": "devnet",
+  "description": "unchecked u64 overflow with overflow-checks on: program panics",
+  "top_level_ix_index": 0,
+  "root_program_id": "6MzbWCZgmdSrBwcUVypa4aGNKdck6r49jV7Y48AhPNey",
+  "failing_program_id": "6MzbWCZgmdSrBwcUVypa4aGNKdck6r49jV7Y48AhPNey",
+  "cpi_depth": 1,
+  "error_kind": "program_failed_to_complete",
+  "error_code": null,
+  "error_name": "ProgramPanicked",
+  "error_message": null,
+  "decode_source": "runtime",
+  "attribution_confidence": "high",
+  "signer": "Dx7RPXNY6qwLY7352Wh5NyatNTSwssmcFiN4Bphs14g2",
+  "uses_alt": false,
+  "log_truncated": false,
+  "cu_consumed": 697,
+  "fee": 5000
+}

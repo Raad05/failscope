@@ -1,0 +1,75 @@
+{
+  "blockTime": 1791457244,
+  "meta": {
+    "computeUnitsConsumed": 697,
+    "costUnits": 1761,
+    "err": {
+      "InstructionError": [
+        0,
+        "ProgramFailedToComplete"
+      ]
+    },
+    "fee": 5000,
+    "innerInstructions": [],
+    "loadedAddresses": {
+      "readonly": [],
+      "writable": []
+    },
+    "logMessages": [
+      "Program 6MzbWCZgmdSrBwcUVypa4aGNKdck6r49jV7Y48AhPNey invoke [1]",
+      "Program log: Instruction: FailOverflowPanic",
+      "Program log: attempt to add with overflow",
+      "Program 6MzbWCZgmdSrBwcUVypa4aGNKdck6r49jV7Y48AhPNey consumed 697 of 200000 compute units",
+      "Program 6MzbWCZgmdSrBwcUVypa4aGNKdck6r49jV7Y48AhPNey failed: SBF program Panicked in programs/fail_target/src/instructions/failures.rs at 51:15"
+    ],
+    "postBalances": [
+      2648119620,
+      833120
+    ],
+    "postTokenBalances": [],
+    "preBalances": [
+      2648124620,
+      833120
+    ],
+    "preTokenBalances": [],
+    "rewards": [],
+    "status": {
+      "Err": {
+        "InstructionError": [
+          0,
+          "ProgramFailedToComplete"
+        ]
+      }
+    }
+  },
+  "slot": 508794682,
+  "transaction": {
+    "message": {
+      "accountKeys": [
+        "Dx7RPXNY6qwLY7352Wh5NyatNTSwssmcFiN4Bphs14g2",
+        "6MzbWCZgmdSrBwcUVypa4aGNKdck6r49jV7Y48AhPNey"
+      ],
+      "header": {
+        "numReadonlySignedAccounts": 0,
+        "numReadonlyUnsignedAccounts": 1,
+        "numRequiredSignatures": 1
+      },
+      "instructions": [
+        {
+          "accounts": [
+            0
+          ],
+          "data": "QkgGNEDJMHk992SD6n3NQP",
+          "programIdIndex": 1,
+          "stackHeight": 1
+        }
+      ],
+      "recentBlockhash": "25tBStANLo63zCKZcSujv4vvPt4s2B24BFvN5ELLAhBr"
+    },
+    "signatures": [
+      "5HWjSnLZGdCNWW6sHeSzG6FBXnTVbZfTzjdsTmC6n73zLJ8y9vRQXfZePfxN9RjsdG7TAb1Sh43fPjq2QKKoFfVE"
+    ]
+  },
+  "transactionIndex": 19,
+  "version": "legacy"
+}

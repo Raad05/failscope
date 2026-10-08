@@ -1,0 +1,20 @@
+{
+  "signature": "28HVHxtxbHF3zzVk1xhR8bFuV7q2vACLRucABzh5dms8xohoNkXdVwstES4EARDYNyp2P3A3tGM5bTRhhbD3xwpH",
+  "cluster": "mainnet-beta",
+  "description": "Jupiter v6 route (SOL->USDC->SOL arb) returns less than minimum; no AnchorError log, IDL only",
+  "top_level_ix_index": 2,
+  "root_program_id": "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4",
+  "failing_program_id": "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4",
+  "cpi_depth": 1,
+  "error_kind": "custom",
+  "error_code": 6001,
+  "error_name": "SlippageToleranceExceeded",
+  "error_message": "Slippage tolerance exceeded",
+  "decode_source": "idl",
+  "attribution_confidence": "high",
+  "signer": "FfAJbv3prDQUybTNkS3EGaoSbkkbSLy1Eahe5MMxMG9t",
+  "uses_alt": true,
+  "log_truncated": false,
+  "cu_consumed": 207449,
+  "fee": 5000
+}

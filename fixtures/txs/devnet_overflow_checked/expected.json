@@ -1,0 +1,20 @@
+{
+  "signature": "3SJoqA1KXmkZK4XN2ZacjR5pz1bXdtZvGwYPqDBgtpsbLwWNW8h1bvBEHMUoyUQ4jwmNC6TnXDY18Sqf1posVSx8",
+  "cluster": "devnet",
+  "description": "checked_add overflow returned as user error",
+  "top_level_ix_index": 0,
+  "root_program_id": "6MzbWCZgmdSrBwcUVypa4aGNKdck6r49jV7Y48AhPNey",
+  "failing_program_id": "6MzbWCZgmdSrBwcUVypa4aGNKdck6r49jV7Y48AhPNey",
+  "cpi_depth": 1,
+  "error_kind": "custom",
+  "error_code": 6001,
+  "error_name": "CheckedOverflow",
+  "error_message": "Checked arithmetic overflowed",
+  "decode_source": "anchor_log",
+  "attribution_confidence": "high",
+  "signer": "Dx7RPXNY6qwLY7352Wh5NyatNTSwssmcFiN4Bphs14g2",
+  "uses_alt": false,
+  "log_truncated": false,
+  "cu_consumed": 1799,
+  "fee": 5000
+}

@@ -1,0 +1,20 @@
+{
+  "signature": "4N4yMwMmynaqWLZm2QGYwmm2vkQesN8reQKNkioGL1fRnr9H7ZmzGpvNDB41bfVRjvi5Jxon2Lt8dGj55kBWbJeU",
+  "cluster": "mainnet-beta",
+  "description": "CUs run out inside Jupiter's self-CPI (depth 2); the outer frame reports 'Program failed to complete' instead",
+  "top_level_ix_index": 4,
+  "root_program_id": "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4",
+  "failing_program_id": "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4",
+  "cpi_depth": 2,
+  "error_kind": "program_failed_to_complete",
+  "error_code": null,
+  "error_name": "ComputeUnitsExceeded",
+  "error_message": null,
+  "decode_source": "runtime",
+  "attribution_confidence": "high",
+  "signer": "CcUrRBMqrCuMPVfd6sVTBJhyhBA1dE7qDoJkSy95bbcw",
+  "uses_alt": true,
+  "log_truncated": false,
+  "cu_consumed": 223864,
+  "fee": 16194
+}

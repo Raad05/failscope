@@ -35,24 +35,33 @@ Record each decision and each resolved "verify" item: what was decided, why, sou
 ### D9: One set of instruction builders for local tests and devnet (M1)
 - `onchain/client` builds every failing transaction. Its LiteSVM tests and its `send_failures` devnet binary use the same builders, so a locally green test means the devnet tx fails the same way. This was confirmed for all 8 cases on 2026-10-08.
 
+### D10: `runtime` decode source for non-`Custom` instruction errors (M2, 2026-10-08)
+- Panics and CU exhaustion have no error code to look up. Their name comes from the runtime's `failed:` reason (`ProgramPanicked`, `ComputeUnitsExceeded`). Counting them as `unknown` would understate coverage, and counting them as `native` would mix them up with System/Token codes.
+- `error_kind` = snake_case `InstructionError` variant (or `TransactionError` variant for tx-level errors).
+
+### D11: IDLs from mainnet are saved as fixtures (M2)
+- `fixtures/idls/<program_id>.json` lets the decoder's IDL step be tested with no network. The decoder takes IDLs as input data (D3 design rule: no I/O).
+
 ## Runtime findings (observed, not assumed)
 
 Observed on Agave 3.1.14 (LiteSVM 0.10 and devnet, identical logs):
 
 - **Compute exhaustion is `InstructionError(i, ProgramFailedToComplete)`, not `ComputationalBudgetExceeded`.** Log: `Program <id> failed: exceeded CUs meter at BPF instruction`, preceded by `consumed N of N compute units`.
 - **A panic is also `ProgramFailedToComplete`.** Log: `Program <id> failed: SBF program Panicked in <file> at <line>:<col>`. The panic message (`attempt to add with overflow`) is a separate `Program log:` line. To tell the two apart, the decoder must read the `failed:` reason.
-- **On a CPI failure, the error propagates unchanged.** Each outer frame logs `failed:` with the same reason (`custom program error: 0x1770`), and the top-level `InstructionError` carries the inner program's code. The first `failed:` line is the innermost program (D3 holds).
+- **On a CPI failure, a custom error propagates unchanged.** Each outer frame logs `failed:` with the same reason (`custom program error: 0x1770`), and the top-level `InstructionError` carries the inner program's code. The first `failed:` line is the innermost program (D3 holds).
+- **Runtime errors do *not* repeat the same reason in outer frames.** On mainnet (fixture `mainnet_compute_exhausted`), the innermost frame logs `failed: exceeded CUs meter at BPF instruction`, but the outer frame of the same program logs `failed: Program failed to complete`. Only the first `failed:` line has the real cause.
 - **Anchor error log line shapes:**
   - `AnchorError thrown in <file>:<line>. Error Code: <Name>. Error Number: <n>. Error Message: <msg>.` (from `require!`/`err!`)
   - `AnchorError caused by account: <acct>. Error Code: …` (constraint/account errors). `has_one` is followed by `Left:` / `<pubkey>` / `Right:` / `<pubkey>` lines.
   - `AnchorError occurred. Error Code: …` (error returned via `?` without location)
+- **IDL format and IDL location are independent.** Jupiter v6 stores a *new-spec* IDL (`metadata.spec` 0.1.0) in the *legacy* account: `create_with_seed(find_program_address([], program_id), "anchor:idl", program_id)`. Layout: 8-byte discriminator, 32-byte authority, u32 LE length, then zlib data. `anchor idl fetch` from Anchor CLI 1.2 looked only at a different address (`FDDfotwLyeLhUQ62ugzgTjwTvF3r64tPRVsKwsqRrbbC` for Jupiter, presumably the Program Metadata location) and failed. M4 must try both locations.
 - Anchor 1.2 CPI codegen needs every `#[derive(Accounts)]` struct to take `'info`, so an empty `struct Foo {}` fails to compile under the `cpi` feature.
 
 ## To verify (resolve during the listed milestone)
 
 | Item | Milestone | Status |
 |---|---|---|
-| Anchor 1.x IDL storage location: Program Metadata Program vs legacy `anchor:idl` account; exact derivation + layout of each | M4 | open |
+| Anchor 1.x IDL storage location: Program Metadata Program vs legacy `anchor:idl` account; exact derivation + layout of each | M4 | legacy derivation + layout confirmed (Jupiter); PMP open |
 | IDL format differences: legacy vs 0.30+ spec (`errors` array shape) | M4 | open |
 | Anchor framework error code table for anchor-lang 1.2 | M3 | open |
 | Which `TransactionError` variants can land (fee charged) in current Agave | M3 | open (CU exhaustion → `ProgramFailedToComplete` confirmed, see findings) |

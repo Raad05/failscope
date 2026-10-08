@@ -1,0 +1,82 @@
+{
+  "blockTime": 1791457243,
+  "meta": {
+    "computeUnitsConsumed": 2019,
+    "costUnits": 3081,
+    "err": {
+      "InstructionError": [
+        0,
+        {
+          "Custom": 3010
+        }
+      ]
+    },
+    "fee": 5000,
+    "innerInstructions": [],
+    "loadedAddresses": {
+      "readonly": [],
+      "writable": []
+    },
+    "logMessages": [
+      "Program 6MzbWCZgmdSrBwcUVypa4aGNKdck6r49jV7Y48AhPNey invoke [1]",
+      "Program log: Instruction: FailMissingSigner",
+      "Program log: AnchorError caused by account: authority. Error Code: AccountNotSigner. Error Number: 3010. Error Message: The given account did not sign.",
+      "Program 6MzbWCZgmdSrBwcUVypa4aGNKdck6r49jV7Y48AhPNey consumed 2019 of 200000 compute units",
+      "Program 6MzbWCZgmdSrBwcUVypa4aGNKdck6r49jV7Y48AhPNey failed: custom program error: 0xbc2"
+    ],
+    "postBalances": [
+      2648124620,
+      833120,
+      0
+    ],
+    "postTokenBalances": [],
+    "preBalances": [
+      2648129620,
+      833120,
+      0
+    ],
+    "preTokenBalances": [],
+    "rewards": [],
+    "status": {
+      "Err": {
+        "InstructionError": [
+          0,
+          {
+            "Custom": 3010
+          }
+        ]
+      }
+    }
+  },
+  "slot": 508794677,
+  "transaction": {
+    "message": {
+      "accountKeys": [
+        "Dx7RPXNY6qwLY7352Wh5NyatNTSwssmcFiN4Bphs14g2",
+        "6MzbWCZgmdSrBwcUVypa4aGNKdck6r49jV7Y48AhPNey",
+        "B5FgoWWXhsb5FYvUS6PMT9gtBzYSbbEKkbbxRBrgA6y3"
+      ],
+      "header": {
+        "numReadonlySignedAccounts": 0,
+        "numReadonlyUnsignedAccounts": 2,
+        "numRequiredSignatures": 1
+      },
+      "instructions": [
+        {
+          "accounts": [
+            2
+          ],
+          "data": "M1sq3aSWJTt",
+          "programIdIndex": 1,
+          "stackHeight": 1
+        }
+      ],
+      "recentBlockhash": "BEaeQp7JB6iKgqDyzmyaNPS87RANbd9mynDCJGGZJawn"
+    },
+    "signatures": [
+      "4MGWvRg3R7rmpJ6H9yb3hmfJ7n5H2akzWSiQjnYn67zPENdHPngwtpyBZpJyz2RKLvpxQwbrEDLjdKjLC7o773pC"
+    ]
+  },
+  "transactionIndex": 9,
+  "version": "legacy"
+}

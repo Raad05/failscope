@@ -1,0 +1,104 @@
+{
+  "blockTime": 1791457259,
+  "meta": {
+    "computeUnitsConsumed": 2541,
+    "costUnits": 3903,
+    "err": {
+      "InstructionError": [
+        0,
+        {
+          "Custom": 1
+        }
+      ]
+    },
+    "fee": 5000,
+    "innerInstructions": [
+      {
+        "index": 0,
+        "instructions": [
+          {
+            "accounts": [
+              0,
+              1
+            ],
+            "data": "3Bxs4jgBT3DDW4Kx",
+            "programIdIndex": 2,
+            "stackHeight": 2
+          }
+        ]
+      }
+    ],
+    "loadedAddresses": {
+      "readonly": [],
+      "writable": []
+    },
+    "logMessages": [
+      "Program 6MzbWCZgmdSrBwcUVypa4aGNKdck6r49jV7Y48AhPNey invoke [1]",
+      "Program log: Instruction: FailCpiSystem",
+      "Program 11111111111111111111111111111111 invoke [2]",
+      "Transfer: insufficient lamports 2648104620, need 18446744073709551615",
+      "Program 11111111111111111111111111111111 failed: custom program error: 0x1",
+      "Program 6MzbWCZgmdSrBwcUVypa4aGNKdck6r49jV7Y48AhPNey consumed 2541 of 200000 compute units",
+      "Program 6MzbWCZgmdSrBwcUVypa4aGNKdck6r49jV7Y48AhPNey failed: custom program error: 0x1"
+    ],
+    "postBalances": [
+      2648104620,
+      0,
+      1,
+      833120
+    ],
+    "postTokenBalances": [],
+    "preBalances": [
+      2648109620,
+      0,
+      1,
+      833120
+    ],
+    "preTokenBalances": [],
+    "rewards": [],
+    "status": {
+      "Err": {
+        "InstructionError": [
+          0,
+          {
+            "Custom": 1
+          }
+        ]
+      }
+    }
+  },
+  "slot": 508794744,
+  "transaction": {
+    "message": {
+      "accountKeys": [
+        "Dx7RPXNY6qwLY7352Wh5NyatNTSwssmcFiN4Bphs14g2",
+        "FWo982RS6twZi4k1MqR2ipDA6mHPRu1yUAq56ESN9wrd",
+        "11111111111111111111111111111111",
+        "6MzbWCZgmdSrBwcUVypa4aGNKdck6r49jV7Y48AhPNey"
+      ],
+      "header": {
+        "numReadonlySignedAccounts": 0,
+        "numReadonlyUnsignedAccounts": 2,
+        "numRequiredSignatures": 1
+      },
+      "instructions": [
+        {
+          "accounts": [
+            0,
+            1,
+            2
+          ],
+          "data": "GdCLGT53VbQ",
+          "programIdIndex": 3,
+          "stackHeight": 1
+        }
+      ],
+      "recentBlockhash": "24okCjcUTkhbNMLBNUEgiX78nuJMxP3Z7XJDNsnXAUb7"
+    },
+    "signatures": [
+      "LmKPNBCz59Vt8coAyMYWPnPuBx2YdeGhLNzNtDZbZpSyZsiNsKcjRZ87Kjqm1SfyHU9SL7dKw4GtWJ1zYpK1TtE"
+    ]
+  },
+  "transactionIndex": 16,
+  "version": "legacy"
+}

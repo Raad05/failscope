@@ -1,0 +1,20 @@
+{
+  "signature": "5WAFxXMnhR22RcddzQF8BmJ234WvB2V7RsWG9nSWpq2wsVz3h7No4ZLpZjFzetTFcKJ9f6MLtSAvqnqAboQ5s7w3",
+  "cluster": "devnet",
+  "description": "require! user error in fail_target",
+  "top_level_ix_index": 0,
+  "root_program_id": "6MzbWCZgmdSrBwcUVypa4aGNKdck6r49jV7Y48AhPNey",
+  "failing_program_id": "6MzbWCZgmdSrBwcUVypa4aGNKdck6r49jV7Y48AhPNey",
+  "cpi_depth": 1,
+  "error_kind": "custom",
+  "error_code": 6000,
+  "error_name": "AlwaysFails",
+  "error_message": "This instruction always fails on purpose",
+  "decode_source": "anchor_log",
+  "attribution_confidence": "high",
+  "signer": "Dx7RPXNY6qwLY7352Wh5NyatNTSwssmcFiN4Bphs14g2",
+  "uses_alt": false,
+  "log_truncated": false,
+  "cu_consumed": 2367,
+  "fee": 5000
+}

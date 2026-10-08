@@ -1,0 +1,20 @@
+{
+  "signature": "5rH9gw6AbWSThyi5TT2XRcayZzAqJZevc1RVAgQwFgJn52RGK1oGDKEjFyDZm9buM72YE1TQVe4KgKZiAiTMQ9qn",
+  "cluster": "mainnet-beta",
+  "description": "Jupiter routes into HBVw6..., which fails with code 8; HBVw6 logs nothing and has no legacy IDL",
+  "top_level_ix_index": 4,
+  "root_program_id": "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4",
+  "failing_program_id": "HBVw6bZtcCaezhcBrmfyXBSBRWCdv72271xQ4GPvms2z",
+  "cpi_depth": 2,
+  "error_kind": "custom",
+  "error_code": 8,
+  "error_name": null,
+  "error_message": null,
+  "decode_source": "unknown",
+  "attribution_confidence": "high",
+  "signer": "29eV5LuZwwVaoufKr5ShBejYVP6N4JZ14U3M5rffXsjp",
+  "uses_alt": true,
+  "log_truncated": false,
+  "cu_consumed": 61107,
+  "fee": 5657
+}

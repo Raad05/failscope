@@ -1,0 +1,20 @@
+{
+  "signature": "hnmFT72vUzgazGNZNmPud9LbvPnUEToFJNx2vJWYLZjXHn1a1pzSxKXkHNn8JT3sQPw3QoiSWLZ59NUMdrxv5zs",
+  "cluster": "mainnet-beta",
+  "description": "Jupiter v6 panics in process_swap.rs",
+  "top_level_ix_index": 2,
+  "root_program_id": "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4",
+  "failing_program_id": "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4",
+  "cpi_depth": 1,
+  "error_kind": "program_failed_to_complete",
+  "error_code": null,
+  "error_name": "ProgramPanicked",
+  "error_message": null,
+  "decode_source": "runtime",
+  "attribution_confidence": "high",
+  "signer": "4jjEXcFPXw7WVGXSTb227HW6wfLprjh2RtiHty4GbetE",
+  "uses_alt": true,
+  "log_truncated": false,
+  "cu_consumed": 151877,
+  "fee": 6850
+}

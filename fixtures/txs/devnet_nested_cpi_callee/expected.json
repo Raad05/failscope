@@ -1,0 +1,20 @@
+{
+  "signature": "23BA6WjR3b2eaFqgY7g7mnRma3Tbd6q8LYzYeJaVt9Duiq6167DHaZsPK7WkCWEYQLmSvjoStKgaxTabDLGAwh6i",
+  "cluster": "devnet",
+  "description": "fail_target CPIs fail_callee, which fails with its own 6000 (same code as AlwaysFails)",
+  "top_level_ix_index": 0,
+  "root_program_id": "6MzbWCZgmdSrBwcUVypa4aGNKdck6r49jV7Y48AhPNey",
+  "failing_program_id": "BCUANLyTtzvYGheyo7ymmHhDDZQ74WGjwsC8Rv3VFDPb",
+  "cpi_depth": 2,
+  "error_kind": "custom",
+  "error_code": 6000,
+  "error_name": "CalleeAlwaysFails",
+  "error_message": "fail_callee always fails when invoked",
+  "decode_source": "anchor_log",
+  "attribution_confidence": "high",
+  "signer": "Dx7RPXNY6qwLY7352Wh5NyatNTSwssmcFiN4Bphs14g2",
+  "uses_alt": false,
+  "log_truncated": false,
+  "cu_consumed": 4688,
+  "fee": 5000
+}

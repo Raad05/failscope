@@ -61,6 +61,7 @@ Verify details against current Solana and Anchor docs before relying on them.
 3. **Anchor framework table**: codes < 6000 from an Anchor program. Source = `anchor_framework`.
 4. **IDL lookup**: map the code to name and message via the program's IDL `errors` array. Source = `idl`.
 5. **Native decoders**: System program, SPL Token / Token-2022, compute budget, Associated Token. Source = `native`.
+5b. **Runtime errors**: non-`Custom` variants (panic, CU exhaustion, ...), named from the `failed:` log reason. Source = `runtime`.
 6. **Fallback**: store raw code and program id as `unknown`. Source = `unknown`.
 
 Always record `decode_source` so decoder coverage can be measured and shown in the dashboard.
@@ -81,7 +82,7 @@ Full key list = static message keys + `loaded_addresses.writable` + `loaded_addr
 - failing_program_id (nullable), root_program_id (nullable)
 - cpi_depth, attribution_confidence (high | low)
 - error_kind (enum), error_code (nullable), error_name (nullable), error_message (nullable)
-- decode_source (anchor_log | anchor_framework | idl | native | unknown)
+- decode_source (anchor_log | anchor_framework | idl | native | runtime | unknown)
 - signer (fee payer), uses_alt (bool), log_truncated (bool)
 - raw_err (jsonb) for debugging
 
@@ -116,7 +117,7 @@ Instructions that each fail deliberately in a distinct way:
 
 ### M2: Fixtures
 - Fetch each signature with `getTransaction` (JSON, `maxSupportedTransactionVersion: 0`) and save to `fixtures/txs/`.
-- Capture at least one failure via Yellowstone gRPC (raw proto, e.g. as JSON/bin) so the proto adapter has golden coverage.
+- ~~Capture at least one failure via Yellowstone gRPC~~: moved to M5 (needs a streaming endpoint).
 - Add a few real **mainnet** failed transactions (slippage failure on a DEX/aggregator, a compute-budget failure, one using an ALT, one with truncated logs if findable) with hand-verified expected results.
 - Done when: each fixture has an `expected.json` (failing program, error name, code, decode source, attribution confidence).
 
@@ -138,6 +139,7 @@ Instructions that each fail deliberately in a distinct way:
 - Done when: `fail_target` errors decode via IDL with the log fallback disabled in a test.
 
 ### M5: Ingest
+- Capture at least one failure as a raw Yellowstone message and add it as a fixture, so the proto adapter has golden coverage.
 - Yellowstone gRPC client subscribing to transactions with `failed: true`, `vote: false` (verify current proto fields).
 - Also subscribe to `blocks_meta` to fill `block_time` (tx updates don't carry it); leave nullable if missing.
 - Proto → decoder input adapter, golden-tested with the M2 gRPC fixture.

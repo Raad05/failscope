@@ -1,0 +1,20 @@
+{
+  "signature": "P7bsBzJwnJiMeW7YsivhkUwCT5BMnJGniLS3PGpHEY5vH9ev9iRBr52ZFaJqwjbNqpYebSAt3K58yr67ABXGi3V",
+  "cluster": "devnet",
+  "description": "busy loop under a 20k CU limit; ix 0 is the compute-budget ix",
+  "top_level_ix_index": 1,
+  "root_program_id": "6MzbWCZgmdSrBwcUVypa4aGNKdck6r49jV7Y48AhPNey",
+  "failing_program_id": "6MzbWCZgmdSrBwcUVypa4aGNKdck6r49jV7Y48AhPNey",
+  "cpi_depth": 1,
+  "error_kind": "program_failed_to_complete",
+  "error_code": null,
+  "error_name": "ComputeUnitsExceeded",
+  "error_message": null,
+  "decode_source": "runtime",
+  "attribution_confidence": "high",
+  "signer": "Dx7RPXNY6qwLY7352Wh5NyatNTSwssmcFiN4Bphs14g2",
+  "uses_alt": false,
+  "log_truncated": false,
+  "cu_consumed": 20000,
+  "fee": 5000
+}

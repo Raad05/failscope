@@ -1,0 +1,20 @@
+{
+  "signature": "4MGWvRg3R7rmpJ6H9yb3hmfJ7n5H2akzWSiQjnYn67zPENdHPngwtpyBZpJyz2RKLvpxQwbrEDLjdKjLC7o773pC",
+  "cluster": "devnet",
+  "description": "Signer account passed with is_signer = false",
+  "top_level_ix_index": 0,
+  "root_program_id": "6MzbWCZgmdSrBwcUVypa4aGNKdck6r49jV7Y48AhPNey",
+  "failing_program_id": "6MzbWCZgmdSrBwcUVypa4aGNKdck6r49jV7Y48AhPNey",
+  "cpi_depth": 1,
+  "error_kind": "custom",
+  "error_code": 3010,
+  "error_name": "AccountNotSigner",
+  "error_message": "The given account did not sign",
+  "decode_source": "anchor_log",
+  "attribution_confidence": "high",
+  "signer": "Dx7RPXNY6qwLY7352Wh5NyatNTSwssmcFiN4Bphs14g2",
+  "uses_alt": false,
+  "log_truncated": false,
+  "cu_consumed": 2019,
+  "fee": 5000
+}

@@ -1,0 +1,20 @@
+{
+  "signature": "LmKPNBCz59Vt8coAyMYWPnPuBx2YdeGhLNzNtDZbZpSyZsiNsKcjRZ87Kjqm1SfyHU9SL7dKw4GtWJ1zYpK1TtE",
+  "cluster": "devnet",
+  "description": "fail_target CPIs a System transfer of u64::MAX lamports; System program fails",
+  "top_level_ix_index": 0,
+  "root_program_id": "6MzbWCZgmdSrBwcUVypa4aGNKdck6r49jV7Y48AhPNey",
+  "failing_program_id": "11111111111111111111111111111111",
+  "cpi_depth": 2,
+  "error_kind": "custom",
+  "error_code": 1,
+  "error_name": "ResultWithNegativeLamports",
+  "error_message": null,
+  "decode_source": "native",
+  "attribution_confidence": "high",
+  "signer": "Dx7RPXNY6qwLY7352Wh5NyatNTSwssmcFiN4Bphs14g2",
+  "uses_alt": false,
+  "log_truncated": false,
+  "cu_consumed": 2541,
+  "fee": 5000
+}

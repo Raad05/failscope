@@ -4,7 +4,7 @@
 
 _Screenshot: coming in M7._
 
-**Status:** M1 done (companion program on devnet). See [PLAN.md](PLAN.md) for the roadmap.
+**Status:** M2 done (12 hand-verified fixtures: 8 devnet, 4 mainnet). See [PLAN.md](PLAN.md) for the roadmap.
 
 ## Failed vs dropped
 

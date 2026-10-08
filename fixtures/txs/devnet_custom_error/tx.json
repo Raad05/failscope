@@ -1,0 +1,79 @@
+{
+  "blockTime": 1791457239,
+  "meta": {
+    "computeUnitsConsumed": 2367,
+    "costUnits": 3429,
+    "err": {
+      "InstructionError": [
+        0,
+        {
+          "Custom": 6000
+        }
+      ]
+    },
+    "fee": 5000,
+    "innerInstructions": [],
+    "loadedAddresses": {
+      "readonly": [],
+      "writable": []
+    },
+    "logMessages": [
+      "Program 6MzbWCZgmdSrBwcUVypa4aGNKdck6r49jV7Y48AhPNey invoke [1]",
+      "Program log: Instruction: FailCustom",
+      "Program log: AnchorError thrown in programs/fail_target/src/instructions/failures.rs:21. Error Code: AlwaysFails. Error Number: 6000. Error Message: This instruction always fails on purpose.",
+      "Program 6MzbWCZgmdSrBwcUVypa4aGNKdck6r49jV7Y48AhPNey consumed 2367 of 200000 compute units",
+      "Program 6MzbWCZgmdSrBwcUVypa4aGNKdck6r49jV7Y48AhPNey failed: custom program error: 0x1770"
+    ],
+    "postBalances": [
+      2648139620,
+      833120
+    ],
+    "postTokenBalances": [],
+    "preBalances": [
+      2648144620,
+      833120
+    ],
+    "preTokenBalances": [],
+    "rewards": [],
+    "status": {
+      "Err": {
+        "InstructionError": [
+          0,
+          {
+            "Custom": 6000
+          }
+        ]
+      }
+    }
+  },
+  "slot": 508794662,
+  "transaction": {
+    "message": {
+      "accountKeys": [
+        "Dx7RPXNY6qwLY7352Wh5NyatNTSwssmcFiN4Bphs14g2",
+        "6MzbWCZgmdSrBwcUVypa4aGNKdck6r49jV7Y48AhPNey"
+      ],
+      "header": {
+        "numReadonlySignedAccounts": 0,
+        "numReadonlyUnsignedAccounts": 1,
+        "numRequiredSignatures": 1
+      },
+      "instructions": [
+        {
+          "accounts": [
+            0
+          ],
+          "data": "AcmMYa5g4Rt",
+          "programIdIndex": 1,
+          "stackHeight": 1
+        }
+      ],
+      "recentBlockhash": "FRvmX8jbAFYbhZiBbvtW9p1SoPZdgNiBm3ceoopBZ4iT"
+    },
+    "signatures": [
+      "5WAFxXMnhR22RcddzQF8BmJ234WvB2V7RsWG9nSWpq2wsVz3h7No4ZLpZjFzetTFcKJ9f6MLtSAvqnqAboQ5s7w3"
+    ]
+  },
+  "transactionIndex": 21,
+  "version": "legacy"
+}

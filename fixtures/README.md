@@ -27,6 +27,48 @@ All were sent with `skip_preflight` and confirmed as failed on chain. Full signa
 - **#4a vs #5:** both are `ProgramFailedToComplete`. Only the `failed:` log line tells a panic from compute exhaustion. The runtime does **not** report `ComputationalBudgetExceeded` for running out of CUs.
 - **#5:** `ix_index` is 1, because the compute-budget instruction comes first.
 
-## Transaction JSON
+## Decoder fixtures (`txs/`)
 
-`txs/`: filled in M2 (`getTransaction` output plus `expected.json` per case).
+One directory per fixture:
+
+- `tx.json`: the `result` of `getTransaction` with `encoding: "json"`, `maxSupportedTransactionVersion: 0`, `commitment: "confirmed"`. Fetch or refresh with `scripts/fetch-fixture.sh <name> <signature> [rpc_url]`.
+- `expected.json`: what the decoder must output. Hand-verified against the logs, and against the program's IDL where one exists.
+
+| Fixture | Cluster | Failing program (depth) | Expected | Source | Why it's here |
+|---|---|---|---|---|---|
+| `devnet_*` (8) | devnet | see table above | see table above | anchor_log / runtime / native | Every companion-program failure mode |
+| `mainnet_jupiter_slippage` | mainnet | Jupiter v6 (1) | 6001 SlippageToleranceExceeded | idl | Real slippage failure. **No AnchorError log line**, so only the IDL can name it |
+| `mainnet_jupiter_panic` | mainnet | Jupiter v6 (1) | ProgramPanicked | runtime | Real panic in a production program |
+| `mainnet_compute_exhausted` | mainnet | Jupiter v6 (2) | ComputeUnitsExceeded | runtime | CUs run out in a self-CPI. The outer frame logs a *different* reason (`Program failed to complete`) |
+| `mainnet_cpi_inner_custom` | mainnet | `HBVw6…` (2) | code 8, name unknown | unknown | Top-level program is Jupiter but the failure is in an inner, silent program with no IDL |
+
+All four mainnet fixtures are v0 transactions with address lookup tables. Account keys must be resolved through `meta.loadedAddresses`.
+
+### `expected.json` fields
+
+| Field | Meaning |
+|---|---|
+| `top_level_ix_index` | Index from `InstructionError(index, _)` |
+| `root_program_id` | Program of that top-level instruction |
+| `failing_program_id` | Innermost program that failed (first `failed:` log line) |
+| `cpi_depth` | Invoke depth of the failing program (1 = top level) |
+| `error_kind` | snake_case `InstructionError` variant (`custom`, `program_failed_to_complete`, ...), or the `TransactionError` variant for tx-level errors |
+| `error_code` | `Custom(n)` code, else null |
+| `error_name` / `error_message` | Decoded name / message. Runtime failures use `ProgramPanicked` / `ComputeUnitsExceeded` |
+| `decode_source` | `anchor_log`, `anchor_framework`, `idl`, `native`, `runtime` or `unknown` |
+| `attribution_confidence` | `high` when the log stack identifies the failing program, `low` when logs are missing or truncated |
+| `signer`, `uses_alt`, `log_truncated`, `cu_consumed`, `fee` | Copied from the transaction |
+
+Golden tests compare every field exactly, except `error_message`. That field is compared only when it is non-null, because the message text for `native` and `runtime` errors is a presentation choice made in M3.
+
+## IDLs (`idls/`)
+
+On-chain IDLs saved for offline tests, named `<program_id>.json`:
+
+- `JUP6Lkb….json`: Jupiter v6, read from the **legacy** Anchor IDL account `C88XWfp26heEmDkmfSzeXP7Fd7GQJ2j9dDTUsyiZbUTa` (zlib-decompressed). It's in the new spec format (`metadata.spec` 0.1.0).
+
+## Not covered yet
+
+- **Truncated logs:** none found in about 120 scanned mainnet failures. M3 builds this case by truncating a real fixture's logs.
+- **SPL Token as the failing program:** none found in the samples scanned (public RPC rate limits cut scans short). Native decoding is covered by the System program case.
+- **Yellowstone gRPC capture:** needs a streaming endpoint. Moved to M5.

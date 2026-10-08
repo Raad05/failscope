@@ -1,0 +1,91 @@
+{
+  "blockTime": 1791457242,
+  "meta": {
+    "computeUnitsConsumed": 4467,
+    "costUnits": 6249,
+    "err": {
+      "InstructionError": [
+        0,
+        {
+          "Custom": 2001
+        }
+      ]
+    },
+    "fee": 10000,
+    "innerInstructions": [],
+    "loadedAddresses": {
+      "readonly": [],
+      "writable": []
+    },
+    "logMessages": [
+      "Program 6MzbWCZgmdSrBwcUVypa4aGNKdck6r49jV7Y48AhPNey invoke [1]",
+      "Program log: Instruction: FailHasOne",
+      "Program log: AnchorError caused by account: counter. Error Code: ConstraintHasOne. Error Number: 2001. Error Message: A has one constraint was violated.",
+      "Program log: Left:",
+      "Program log: Dx7RPXNY6qwLY7352Wh5NyatNTSwssmcFiN4Bphs14g2",
+      "Program log: Right:",
+      "Program log: 3W2PxFud5XWF8BvSjij2TvWrHtMSES6KkcAdSb3JaEc8",
+      "Program 6MzbWCZgmdSrBwcUVypa4aGNKdck6r49jV7Y48AhPNey consumed 4467 of 200000 compute units",
+      "Program 6MzbWCZgmdSrBwcUVypa4aGNKdck6r49jV7Y48AhPNey failed: custom program error: 0x7d1"
+    ],
+    "postBalances": [
+      2648129620,
+      0,
+      833120,
+      894080
+    ],
+    "postTokenBalances": [],
+    "preBalances": [
+      2648139620,
+      0,
+      833120,
+      894080
+    ],
+    "preTokenBalances": [],
+    "rewards": [],
+    "status": {
+      "Err": {
+        "InstructionError": [
+          0,
+          {
+            "Custom": 2001
+          }
+        ]
+      }
+    }
+  },
+  "slot": 508794672,
+  "transaction": {
+    "message": {
+      "accountKeys": [
+        "Dx7RPXNY6qwLY7352Wh5NyatNTSwssmcFiN4Bphs14g2",
+        "3W2PxFud5XWF8BvSjij2TvWrHtMSES6KkcAdSb3JaEc8",
+        "6MzbWCZgmdSrBwcUVypa4aGNKdck6r49jV7Y48AhPNey",
+        "6g4TNMhRd5ZyHs1k2ocBwYqpdyZX3MogMRoqAkw6g5qZ"
+      ],
+      "header": {
+        "numReadonlySignedAccounts": 1,
+        "numReadonlyUnsignedAccounts": 2,
+        "numRequiredSignatures": 2
+      },
+      "instructions": [
+        {
+          "accounts": [
+            3,
+            1
+          ],
+          "data": "EWrwsYn7gAi",
+          "programIdIndex": 2,
+          "stackHeight": 1
+        }
+      ],
+      "recentBlockhash": "718vMutgBjKyh8FbDzfBzN38Ta2c8AW9HsVaxFywoNJz"
+    },
+    "signatures": [
+      "2KGfeQ9Hkfkz92xSKVuf6tW2MvA5UfB9xNm4QPduoKDKApK6SyxifsHyaikuLBd3j6PmELhu2AHpQCVMzgcT3NTZ",
+      "4WyCtUnb6suxDn2TckX38p1NzpqDvRmwMRb1vLhpj56nf75AW34DSTVrC4FMSPKmNjzs3PZQQe8feEZPjf3V4FTs"
+    ]
+  },
+  "transactionIndex": 10,
+  "version": "legacy"
+}
