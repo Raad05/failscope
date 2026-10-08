@@ -56,13 +56,14 @@ Verify details against current Solana and Anchor docs before relying on them.
   - `Log truncated`
 
 ### Decoding pipeline (in order)
-1. **Attribute** the failure by walking the log stack (push on `invoke [n]`, pop on `success` / `failed`). Every frame emits `failed:` while unwinding, so the innermost failing program is the **first** `failed` line. Cross-check against `inner_instructions[ix_index]`. If logs are truncated or absent, fall back to the root program and set `attribution_confidence = low`.
-2. **Parse the Anchor error log line** if present. Gives name and message with no IDL needed. Source = `anchor_log`.
-3. **Anchor framework table**: codes < 6000 from an Anchor program. Source = `anchor_framework`.
-4. **IDL lookup**: map the code to name and message via the program's IDL `errors` array. Source = `idl`.
-5. **Native decoders**: System program, SPL Token / Token-2022, compute budget, Associated Token. Source = `native`.
-5b. **Runtime errors**: non-`Custom` variants (panic, CU exhaustion, ...), named from the `failed:` log reason. Source = `runtime`.
-6. **Fallback**: store raw code and program id as `unknown`. Source = `unknown`.
+1. **Attribute** the failure by walking the log stack (push on `invoke [n]`, pop on `success` / `failed`). Every frame emits `failed:` while unwinding, so the innermost failing program is the **first** `failed` line. Cross-check against the root program and `inner_instructions[ix_index]`. If logs are truncated or absent: no CPI ran → the root program (high); CPIs ran → root as a guess with `attribution_confidence = low`, and no program-keyed name (D13).
+2. **Name** the error, first match wins (D12):
+   1. Anchor error log line from the failing frame, number matching the code. Source = `anchor_log`.
+   2. Native tables by program id: System, SPL Token / Token-2022, Associated Token. Source = `native`.
+   3. IDL `errors` of the failing program. Source = `idl`.
+   4. Anchor framework table (codes < 6000), only for programs with an IDL. Source = `anchor_framework`.
+   5. Non-`Custom` runtime errors, refined by the `failed:` reason (panic, CU exhaustion). Source = `runtime`.
+   6. Fallback: keep raw code and program id. Source = `unknown`.
 
 Always record `decode_source` so decoder coverage can be measured and shown in the dashboard.
 
@@ -81,7 +82,7 @@ Full key list = static message keys + `loaded_addresses.writable` + `loaded_addr
 - top_level_ix_index (nullable)
 - failing_program_id (nullable), root_program_id (nullable)
 - cpi_depth, attribution_confidence (high | low)
-- error_kind (enum), error_code (nullable), error_name (nullable), error_message (nullable)
+- error_kind (enum), error_code (nullable), error_name (nullable), error_message (nullable), error_account (nullable; account named by an Anchor constraint error)
 - decode_source (anchor_log | anchor_framework | idl | native | runtime | unknown)
 - signer (fee payer), uses_alt (bool), log_truncated (bool)
 - raw_err (jsonb) for debugging

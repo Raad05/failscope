@@ -1,0 +1,313 @@
+{
+  "address": "6MzbWCZgmdSrBwcUVypa4aGNKdck6r49jV7Y48AhPNey",
+  "metadata": {
+    "name": "fail_target",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "Companion program that fails on purpose, for failscope fixtures"
+  },
+  "instructions": [
+    {
+      "name": "fail_compute",
+      "discriminator": [
+        51,
+        175,
+        86,
+        44,
+        225,
+        247,
+        136,
+        223
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "fail_cpi_system",
+      "discriminator": [
+        93,
+        104,
+        255,
+        7,
+        192,
+        23,
+        38,
+        203
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "recipient",
+          "writable": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "fail_custom",
+      "discriminator": [
+        57,
+        126,
+        124,
+        234,
+        203,
+        89,
+        248,
+        199
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "fail_has_one",
+      "discriminator": [
+        80,
+        204,
+        204,
+        74,
+        184,
+        207,
+        48,
+        79
+      ],
+      "accounts": [
+        {
+          "name": "counter",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  117,
+                  110,
+                  116,
+                  101,
+                  114
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "signer": true,
+          "relations": [
+            "counter"
+          ]
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "fail_missing_signer",
+      "discriminator": [
+        119,
+        169,
+        154,
+        253,
+        24,
+        34,
+        146,
+        179
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "fail_nested_cpi",
+      "discriminator": [
+        197,
+        36,
+        128,
+        180,
+        129,
+        25,
+        108,
+        95
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "signer": true
+        },
+        {
+          "name": "callee_program",
+          "address": "BCUANLyTtzvYGheyo7ymmHhDDZQ74WGjwsC8Rv3VFDPb"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "fail_overflow_checked",
+      "discriminator": [
+        104,
+        117,
+        228,
+        19,
+        207,
+        9,
+        219,
+        90
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "fail_overflow_panic",
+      "discriminator": [
+        192,
+        91,
+        94,
+        129,
+        123,
+        32,
+        122,
+        250
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "initialize",
+      "discriminator": [
+        175,
+        175,
+        109,
+        31,
+        13,
+        152,
+        155,
+        237
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "counter",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  117,
+                  110,
+                  116,
+                  101,
+                  114
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    }
+  ],
+  "accounts": [
+    {
+      "name": "Counter",
+      "discriminator": [
+        255,
+        176,
+        4,
+        245,
+        188,
+        253,
+        124,
+        25
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "AlwaysFails",
+      "msg": "This instruction always fails on purpose"
+    },
+    {
+      "code": 6001,
+      "name": "CheckedOverflow",
+      "msg": "Checked arithmetic overflowed"
+    }
+  ],
+  "types": [
+    {
+      "name": "Counter",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "count",
+            "type": "u64"
+          },
+          {
+            "name": "authority",
+            "type": "pubkey"
+          }
+        ]
+      }
+    }
+  ],
+  "constants": [
+    {
+      "name": "COUNTER_SEED",
+      "type": "bytes",
+      "value": "[99, 111, 117, 110, 116, 101, 114]"
+    }
+  ]
+}

@@ -65,10 +65,11 @@ Golden tests compare every field exactly, except `error_message`. That field is 
 
 On-chain IDLs saved for offline tests, named `<program_id>.json`:
 
+- `6MzbWC….json`, `BCUANL….json`: `fail_target` and `fail_callee`, from `anchor build` (`onchain/target/idl/`). Not uploaded on chain yet (M4).
 - `JUP6Lkb….json`: Jupiter v6, read from the **legacy** Anchor IDL account `C88XWfp26heEmDkmfSzeXP7Fd7GQJ2j9dDTUsyiZbUTa` (zlib-decompressed). It's in the new spec format (`metadata.spec` 0.1.0).
 
 ## Not covered yet
 
-- **Truncated logs:** none found in about 120 scanned mainnet failures. M3 builds this case by truncating a real fixture's logs.
+- **Truncated logs:** none found in about 120 scanned mainnet failures. `crates/decoder/tests/degraded.rs` builds these cases from real fixtures (truncated, Anchor lines stripped, logs missing), and `tests/props.rs` cuts every fixture's logs at random points.
 - **SPL Token as the failing program:** none found in the samples scanned (public RPC rate limits cut scans short). Native decoding is covered by the System program case.
 - **Yellowstone gRPC capture:** needs a streaming endpoint. Moved to M5.
