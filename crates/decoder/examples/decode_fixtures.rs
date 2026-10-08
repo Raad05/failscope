@@ -14,8 +14,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut idls = IdlErrorTable::new();
     for entry in fs::read_dir(root.join("idls"))? {
         let path = entry?.path();
-        let program_id = path.file_stem().and_then(|s| s.to_str()).unwrap_or_default();
-        idls.add_idl(program_id, &serde_json::from_str(&fs::read_to_string(&path)?)?)?;
+        let program_id = path
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or_default();
+        idls.add_idl(
+            program_id,
+            &serde_json::from_str(&fs::read_to_string(&path)?)?,
+        )?;
     }
 
     let mut dirs: Vec<_> = fs::read_dir(root.join("txs"))?.collect::<Result<_, _>>()?;
