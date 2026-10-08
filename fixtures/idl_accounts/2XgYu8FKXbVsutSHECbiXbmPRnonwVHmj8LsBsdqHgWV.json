@@ -1,0 +1,16 @@
+{
+  "cluster": "devnet",
+  "address": "2XgYu8FKXbVsutSHECbiXbmPRnonwVHmj8LsBsdqHgWV",
+  "note": "canonical PMP metadata (seed idl) for BCUANLyTtzvYGheyo7ymmHhDDZQ74WGjwsC8Rv3VFDPb",
+  "value": {
+    "data": [
+      "ApeE+EQWVfPs6p8d4PSbIjMdCnwW5ZcQAY6jKvNB624+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAWlkbAAAAAAAAAAAAAAAAAABAgEAZQEAAAAAAAAAeJxtUttOAjEQfecrmn0mZLkIiE+4BDQxBo2XqCGmdsfd6rYl7bBkJfy7bWHZFexTZ05nzpkz3TQICWgcazAmGJHgMnoc394UD/iTv8xSKNSgEOIqnUxe7wa959nX2kTD+7z7NJ3MP4KmKxaANKZIbfXGxjYjqQDX65Py7J3RLAPwTy2UgzZcSYeGrXYrLPNmCewkGYNhmi9xX/DAZUGWWiWaCoIpReIJkOoEkETza0O4RHXh04asOaaEoyFqLQlbGVSCgNZKB7b71kvn0qBeMUfghn/ztLshjsfgUoLeC3PSuJMmuKRoG5al7rSHg2YVdLpVcN6uAf1OLTgbVkGnXwd6NSDcXxcHFZQxtZJo/gjYHG61GfwWKv07z3niZhoR6wEcgO0pi048w6JR4h4LvJn/+MZU7Dj7YRg2j72M/G8YZ2tamKlbU2WpMMnRpyHUvyv3mYK0C87VN8RBJaWx/QV+yLLN",
+      "base64"
+    ],
+    "executable": false,
+    "lamports": 2951480,
+    "owner": "ProgM6JCCvbYkfKqJYHePx4xxSUSqJp7rh8Lyv7nk7S",
+    "rentEpoch": 18446744073709551615,
+    "space": 453
+  }
+}

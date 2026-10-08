@@ -4,7 +4,7 @@
 
 _Screenshot: coming in M7._
 
-**Status:** M3 done (decoder crate; all 12 fixtures decode to their hand-verified results). See [PLAN.md](PLAN.md) for the roadmap.
+**Status:** M4 done (on-chain IDL fetch + cache; errors decode from on-chain IDLs). See [PLAN.md](PLAN.md) for the roadmap.
 
 ## Failed vs dropped
 
@@ -45,7 +45,8 @@ Yellowstone gRPC ──> ingest ──> decoder ──> store (Postgres) ──>
    4. `anchor_framework`: Anchor's built-in codes (< 6000), only for programs with a known IDL. Other programs may use those numbers for something else.
    5. `runtime`: non-`Custom` errors, refined by the `failed:` reason (`ProgramPanicked`, `ComputeUnitsExceeded`).
    6. `unknown`: code and program are kept; the name is not.
-3. **Derive** `cu_requested` and `priority_fee` from compute-budget instructions using agave 3.1's rules. Tests check that `5000 × signatures + priority_fee` equals the charged fee for every fixture.
+3. **IDLs** come from `crates/idl`, which reads both on-chain locations in one RPC call: the legacy Anchor IDL account (Anchor < 1.0, most mainnet programs) and the Program Metadata account (Anchor ≥ 1.0). Both IDL formats are handled. A TTL cache, which also caches "no IDL", feeds the decoder.
+4. **Derive** `cu_requested` and `priority_fee` from compute-budget instructions using agave 3.1's rules. Tests check that `5000 × signatures + priority_fee` equals the charged fee for every fixture.
 
 ## Companion program failure modes
 

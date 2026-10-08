@@ -65,8 +65,20 @@ Golden tests compare every field exactly, except `error_message`. That field is 
 
 On-chain IDLs saved for offline tests, named `<program_id>.json`:
 
-- `6MzbWC….json`, `BCUANL….json`: `fail_target` and `fail_callee`, from `anchor build` (`onchain/target/idl/`). Not uploaded on chain yet (M4).
+- `6MzbWC….json`, `BCUANL….json`: `fail_target` and `fail_callee`, from `anchor build` (`onchain/target/idl/`). Uploaded to devnet as Program Metadata in M4.
 - `JUP6Lkb….json`: Jupiter v6, read from the **legacy** Anchor IDL account `C88XWfp26heEmDkmfSzeXP7Fd7GQJ2j9dDTUsyiZbUTa` (zlib-decompressed). It's in the new spec format (`metadata.spec` 0.1.0).
+
+## On-chain IDL accounts (`idl_accounts/`)
+
+Raw `getAccountInfo` results (base64), named by account address, used by `crates/idl` tests without network. A `value` of `null` means no account exists there.
+
+| Account | Program | Location | IDL format |
+|---|---|---|---|
+| `HZbAvB…` | fail_target (devnet) | Program Metadata | spec |
+| `2XgYu8…` | fail_callee (devnet) | Program Metadata | spec |
+| `C88XWf…` | Jupiter v6 | legacy | spec |
+| `9jWC3E…` | Marinade | legacy | legacy |
+| `FDDfot…` | Jupiter v6 | Program Metadata | _none (null)_ |
 
 ## Not covered yet
 

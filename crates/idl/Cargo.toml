@@ -8,6 +8,20 @@ license.workspace = true
 publish = false
 
 [dependencies]
+base64.workspace = true
+bs58.workspace = true
+failscope-decoder.workspace = true
+flate2.workspace = true
+reqwest.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+solana-address.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt-multi-thread", "test-util"] }
 
 [lints]
 workspace = true
