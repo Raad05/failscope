@@ -1,0 +1,13 @@
+[package]
+name = "failscope-decoder"
+description = "Pure decoder: turns failed-transaction data into a classified, attributed failure. No I/O."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+
+[lints]
+workspace = true
