@@ -4,7 +4,7 @@
 
 _Screenshot: coming in M7._
 
-**Status:** M0 (project setup). See [PLAN.md](PLAN.md) for the roadmap.
+**Status:** M1 done (companion program on devnet). See [PLAN.md](PLAN.md) for the roadmap.
 
 ## Failed vs dropped
 
@@ -37,10 +37,20 @@ _Described in M3._
 
 ## Companion program failure modes
 
-_Table filled in M1/M3._
+`onchain/` holds two Anchor programs deployed on devnet: `fail_target` (one instruction per failure mode) and `fail_callee` (fails inside a nested CPI). Signatures and explorer links are in [fixtures/README.md](fixtures/README.md).
 
-| # | Failure | How it fails | Decoded as |
-|---|---|---|---|
+| # | Failure | Transaction error | Program that actually failed | Decoded as |
+|---|---|---|---|---|
+| 1 | `require!` user error | `InstructionError(0, Custom(6000))` | fail_target | _M3_ |
+| 2 | `has_one` constraint | `InstructionError(0, Custom(2001))` | fail_target | _M3_ |
+| 3 | missing signer | `InstructionError(0, Custom(3010))` | fail_target | _M3_ |
+| 4a | unchecked overflow (panic) | `InstructionError(0, ProgramFailedToComplete)` | fail_target | _M3_ |
+| 4b | checked overflow | `InstructionError(0, Custom(6001))` | fail_target | _M3_ |
+| 5 | compute exhaustion | `InstructionError(1, ProgramFailedToComplete)` | fail_target | _M3_ |
+| 6 | CPI to System with bad transfer | `InstructionError(0, Custom(1))` | System program | _M3_ |
+| 7 | nested CPI, callee error | `InstructionError(0, Custom(6000))` | fail_callee | _M3_ |
+
+Rows 1 and 7 share the exact same transaction error, and rows 4a and 5 share the same variant. Telling them apart is the decoder's job.
 
 ## Decoder coverage
 
@@ -61,8 +71,9 @@ cargo run          # starts the failscope binary
 
 # on-chain workspace
 cd onchain
-cargo test
-anchor build
+anchor build --arch v0   # SBPF v0; tests load target/deploy/*.so
+cargo test               # LiteSVM: runs every failure case locally
+cargo run -p fail_client --bin send_failures   # devnet only; writes fixtures/signatures.json
 ```
 
 ## What I learned

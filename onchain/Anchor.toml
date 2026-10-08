@@ -7,6 +7,11 @@ resolution = true
 skip-lint = false
 
 [programs.localnet]
+fail_callee = "BCUANLyTtzvYGheyo7ymmHhDDZQ74WGjwsC8Rv3VFDPb"
+fail_target = "6MzbWCZgmdSrBwcUVypa4aGNKdck6r49jV7Y48AhPNey"
+
+[programs.devnet]
+fail_callee = "BCUANLyTtzvYGheyo7ymmHhDDZQ74WGjwsC8Rv3VFDPb"
 fail_target = "6MzbWCZgmdSrBwcUVypa4aGNKdck6r49jV7Y48AhPNey"
 
 [provider]

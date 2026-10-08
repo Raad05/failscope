@@ -28,6 +28,26 @@ Record each decision and each resolved "verify" item: what was decided, why, sou
 ### D7: No-unwrap rule enforced by clippy
 - `unwrap_used` / `expect_used` = deny at workspace level. `clippy.toml` allows both in tests. `main` returns `anyhow::Result`, so it doesn't need them either.
 
+### D8: Programs built as SBPF v0 (`anchor build --arch v0`) (M1, 2026-10-08)
+- Anchor CLI 1.2 defaults to `--arch v3`. LiteSVM 0.10 refuses to load v3 ELFs (`InvalidAccountData`). Nearly all deployed mainnet programs are v0, so fixtures built from v0 are more realistic. `cargo build-sbf` already defaults to v0, so CI matches.
+- Unverified: whether devnet accepts v3 deployments today. Not needed.
+
+### D9: One set of instruction builders for local tests and devnet (M1)
+- `onchain/client` builds every failing transaction. Its LiteSVM tests and its `send_failures` devnet binary use the same builders, so a locally green test means the devnet tx fails the same way. This was confirmed for all 8 cases on 2026-10-08.
+
+## Runtime findings (observed, not assumed)
+
+Observed on Agave 3.1.14 (LiteSVM 0.10 and devnet, identical logs):
+
+- **Compute exhaustion is `InstructionError(i, ProgramFailedToComplete)`, not `ComputationalBudgetExceeded`.** Log: `Program <id> failed: exceeded CUs meter at BPF instruction`, preceded by `consumed N of N compute units`.
+- **A panic is also `ProgramFailedToComplete`.** Log: `Program <id> failed: SBF program Panicked in <file> at <line>:<col>`. The panic message (`attempt to add with overflow`) is a separate `Program log:` line. To tell the two apart, the decoder must read the `failed:` reason.
+- **On a CPI failure, the error propagates unchanged.** Each outer frame logs `failed:` with the same reason (`custom program error: 0x1770`), and the top-level `InstructionError` carries the inner program's code. The first `failed:` line is the innermost program (D3 holds).
+- **Anchor error log line shapes:**
+  - `AnchorError thrown in <file>:<line>. Error Code: <Name>. Error Number: <n>. Error Message: <msg>.` (from `require!`/`err!`)
+  - `AnchorError caused by account: <acct>. Error Code: …` (constraint/account errors). `has_one` is followed by `Left:` / `<pubkey>` / `Right:` / `<pubkey>` lines.
+  - `AnchorError occurred. Error Code: …` (error returned via `?` without location)
+- Anchor 1.2 CPI codegen needs every `#[derive(Accounts)]` struct to take `'info`, so an empty `struct Foo {}` fails to compile under the `cpi` feature.
+
 ## To verify (resolve during the listed milestone)
 
 | Item | Milestone | Status |
@@ -35,7 +55,7 @@ Record each decision and each resolved "verify" item: what was decided, why, sou
 | Anchor 1.x IDL storage location: Program Metadata Program vs legacy `anchor:idl` account; exact derivation + layout of each | M4 | open |
 | IDL format differences: legacy vs 0.30+ spec (`errors` array shape) | M4 | open |
 | Anchor framework error code table for anchor-lang 1.2 | M3 | open |
-| Which `TransactionError` variants can land (fee charged) in current Agave | M3 | open |
+| Which `TransactionError` variants can land (fee charged) in current Agave | M3 | open (CU exhaustion → `ProgramFailedToComplete` confirmed, see findings) |
 | Default CU limit rule (200k per non-builtin ix, 1.4M cap) in current runtime | M3 | open |
 | Yellowstone proto: `failed` filter field, `from_slot` support + provider retention window | M5 | open |
 | Current compatible versions: yellowstone-grpc-client/proto ↔ solana-* split crates | M0/M5 | open |

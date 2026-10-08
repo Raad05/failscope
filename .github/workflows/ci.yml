@@ -24,6 +24,8 @@ jobs:
   onchain:
     name: on-chain (onchain/)
     runs-on: ubuntu-latest
+    env:
+      AGAVE_VERSION: 3.1.14
     defaults:
       run:
         working-directory: onchain
@@ -33,6 +35,22 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: onchain
+      - name: Cache Agave CLI and platform tools
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.local/share/solana
+            ~/.cache/solana
+          key: agave-${{ env.AGAVE_VERSION }}
+      - name: Install Agave CLI
+        run: |
+          if [ ! -x ~/.local/share/solana/install/active_release/bin/cargo-build-sbf ]; then
+            sh -c "$(curl -sSfL https://release.anza.xyz/v${AGAVE_VERSION}/install)"
+          fi
+          echo "$HOME/.local/share/solana/install/active_release/bin" >> "$GITHUB_PATH"
+      # LiteSVM tests load target/deploy/*.so. build-sbf defaults to SBPF v0 (D8).
+      - run: cargo build-sbf --manifest-path programs/fail_callee/Cargo.toml
+      - run: cargo build-sbf --manifest-path programs/fail_target/Cargo.toml
       - run: cargo fmt --all --check
       - run: cargo clippy --all-targets --locked -- -D warnings
       - run: cargo test --locked

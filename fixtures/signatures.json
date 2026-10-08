@@ -1,0 +1,50 @@
+[
+  {
+    "case": "custom_error",
+    "signature": "5WAFxXMnhR22RcddzQF8BmJ234WvB2V7RsWG9nSWpq2wsVz3h7No4ZLpZjFzetTFcKJ9f6MLtSAvqnqAboQ5s7w3",
+    "cluster": "https://api.devnet.solana.com",
+    "err": "InstructionError(0, Custom(6000))"
+  },
+  {
+    "case": "has_one_violation",
+    "signature": "2KGfeQ9Hkfkz92xSKVuf6tW2MvA5UfB9xNm4QPduoKDKApK6SyxifsHyaikuLBd3j6PmELhu2AHpQCVMzgcT3NTZ",
+    "cluster": "https://api.devnet.solana.com",
+    "err": "InstructionError(0, Custom(2001))"
+  },
+  {
+    "case": "missing_signer",
+    "signature": "4MGWvRg3R7rmpJ6H9yb3hmfJ7n5H2akzWSiQjnYn67zPENdHPngwtpyBZpJyz2RKLvpxQwbrEDLjdKjLC7o773pC",
+    "cluster": "https://api.devnet.solana.com",
+    "err": "InstructionError(0, Custom(3010))"
+  },
+  {
+    "case": "overflow_panic",
+    "signature": "5HWjSnLZGdCNWW6sHeSzG6FBXnTVbZfTzjdsTmC6n73zLJ8y9vRQXfZePfxN9RjsdG7TAb1Sh43fPjq2QKKoFfVE",
+    "cluster": "https://api.devnet.solana.com",
+    "err": "InstructionError(0, ProgramFailedToComplete)"
+  },
+  {
+    "case": "overflow_checked",
+    "signature": "3SJoqA1KXmkZK4XN2ZacjR5pz1bXdtZvGwYPqDBgtpsbLwWNW8h1bvBEHMUoyUQ4jwmNC6TnXDY18Sqf1posVSx8",
+    "cluster": "https://api.devnet.solana.com",
+    "err": "InstructionError(0, Custom(6001))"
+  },
+  {
+    "case": "compute_exhausted",
+    "signature": "P7bsBzJwnJiMeW7YsivhkUwCT5BMnJGniLS3PGpHEY5vH9ev9iRBr52ZFaJqwjbNqpYebSAt3K58yr67ABXGi3V",
+    "cluster": "https://api.devnet.solana.com",
+    "err": "InstructionError(1, ProgramFailedToComplete)"
+  },
+  {
+    "case": "cpi_system_transfer",
+    "signature": "LmKPNBCz59Vt8coAyMYWPnPuBx2YdeGhLNzNtDZbZpSyZsiNsKcjRZ87Kjqm1SfyHU9SL7dKw4GtWJ1zYpK1TtE",
+    "cluster": "https://api.devnet.solana.com",
+    "err": "InstructionError(0, Custom(1))"
+  },
+  {
+    "case": "nested_cpi_callee",
+    "signature": "23BA6WjR3b2eaFqgY7g7mnRma3Tbd6q8LYzYeJaVt9Duiq6167DHaZsPK7WkCWEYQLmSvjoStKgaxTabDLGAwh6i",
+    "cluster": "https://api.devnet.solana.com",
+    "err": "InstructionError(0, Custom(6000))"
+  }
+]
