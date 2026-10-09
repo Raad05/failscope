@@ -16,8 +16,10 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use failscope_decoder::{decode, DecodeSource, DecodedFailure, TxInput};
-use failscope_idl::{AccountSource, IdlCache};
-use failscope_store::Store;
+use failscope_idl::{
+    detect_format, AccountSource, FetchStatus, Idl, IdlCache, IdlFormat, IdlLocation,
+};
+use failscope_store::{IdlCacheRow, Store};
 use futures::{SinkExt, StreamExt};
 use tokio::sync::{mpsc, watch};
 use tokio::time::{sleep, Instant};
@@ -101,6 +103,8 @@ where
     let (tx, rx) = mpsc::channel(config.channel_capacity);
     let (stop_tx, stop_rx) = watch::channel(false);
 
+    let seeded = seed_idls(store.as_ref(), &idls).await?;
+    tracing::info!(seeded, "IDL cache loaded from store");
     let consumer = tokio::spawn(consume(config.clone(), Arc::clone(&store), idls, rx));
     let producer = produce(config, store, tx, stop_rx);
 
@@ -365,7 +369,10 @@ async fn consume<St: Store, S: AccountSource>(
         match event {
             Event::Tx { slot, info } => match tx_input(slot, &info) {
                 Ok(Some(input)) => {
-                    let failure = decode_with_idls(&input, &idls).await;
+                    let (failure, refreshed) = decode_with_idls(&input, &idls).await;
+                    if let Some(program) = refreshed {
+                        persist_idl(store.as_ref(), &idls, &program).await?;
+                    }
                     if store.insert_failure(&failure).await? {
                         stats.inserted += 1;
                         tracing::debug!(
@@ -421,19 +428,91 @@ async fn flush_cursor<St: Store>(
 
 /// Decodes; if a custom code is still unnamed, fetches the failing
 /// program's IDL (cached, including "no IDL") and decodes again.
+/// Also returns the program whose cache entry was just refreshed, if any,
+/// so the caller can persist it.
 pub async fn decode_with_idls<S: AccountSource>(
     input: &TxInput,
     idls: &IdlCache<S>,
-) -> DecodedFailure {
+) -> (DecodedFailure, Option<String>) {
     let first = decode(input, idls);
     let needs_idl = first.decode_source == DecodeSource::Unknown && first.error_code.is_some();
     match (&first.failing_program_id, needs_idl) {
         (Some(program), true) => {
-            idls.ensure(program).await;
-            decode(input, idls)
+            let ensured = idls.ensure(program).await;
+            let refreshed = ensured.refreshed.then(|| program.clone());
+            (decode(input, idls), refreshed)
         }
-        _ => first,
+        _ => (first, None),
     }
+}
+
+/// Loads persisted IDL lookups into the cache, keeping their original age.
+async fn seed_idls<St: Store, S: AccountSource>(
+    store: &St,
+    idls: &IdlCache<S>,
+) -> Result<usize, IngestError> {
+    let rows = store.load_idls().await?;
+    let mut seeded = 0;
+    for row in rows {
+        let status = match row.fetch_status.as_str() {
+            "found" => FetchStatus::Found,
+            "missing" => FetchStatus::Missing,
+            _ => continue,
+        };
+        let idl = match (
+            status,
+            row.idl_json,
+            row.location.as_deref().and_then(IdlLocation::parse),
+        ) {
+            (FetchStatus::Found, Some(json), Some(location)) => Some(Idl {
+                program_id: row.program_id.clone(),
+                location,
+                format: row
+                    .idl_format
+                    .as_deref()
+                    .and_then(IdlFormat::parse)
+                    .unwrap_or_else(|| detect_format(&json)),
+                json,
+            }),
+            (FetchStatus::Found, _, _) => continue,
+            _ => None,
+        };
+        idls.seed(
+            &row.program_id,
+            status,
+            idl,
+            Duration::from_secs(row.age_secs),
+        );
+        seeded += 1;
+    }
+    Ok(seeded)
+}
+
+/// Writes a program's current cache entry (found or missing) to the store.
+async fn persist_idl<St: Store, S: AccountSource>(
+    store: &St,
+    idls: &IdlCache<S>,
+    program_id: &str,
+) -> Result<(), IngestError> {
+    let Some(entry) = idls.entry(program_id) else {
+        return Ok(());
+    };
+    let fetch_status = match entry.status {
+        FetchStatus::Found => "found",
+        FetchStatus::Missing => "missing",
+        FetchStatus::Error => return Ok(()),
+    };
+    store
+        .upsert_idl(&IdlCacheRow {
+            program_id: program_id.to_string(),
+            fetch_status: fetch_status.to_string(),
+            location: entry.idl.as_ref().map(|i| i.location.as_str().to_string()),
+            idl_format: entry.idl.as_ref().map(|i| i.format.to_text()),
+            idl_json: entry.idl.as_ref().map(|i| i.json.clone()),
+            age_secs: entry.fetched_at.elapsed().as_secs(),
+        })
+        .await?;
+    Ok(())
 }
 
 #[cfg(test)]

@@ -8,6 +8,13 @@ use std::future::Future;
 use failscope_decoder::DecodedFailure;
 use sqlx::postgres::{PgPool, PgPoolOptions};
 
+mod queries;
+
+pub use queries::{
+    Bucket, CoveragePart, ErrorCount, FailureFilter, FailureRow, Page, Queries, TimeBucket,
+    TopProgram, MAX_LIMIT,
+};
+
 #[derive(Debug, thiserror::Error)]
 pub enum StoreError {
     #[error(transparent)]
@@ -42,6 +49,25 @@ pub trait Store: Send + Sync {
         to_slot: u64,
         reason: &str,
     ) -> impl Future<Output = Result<()>> + Send;
+
+    /// Inserts or replaces a program's cached IDL lookup.
+    fn upsert_idl(&self, row: &IdlCacheRow) -> impl Future<Output = Result<()>> + Send;
+
+    fn load_idls(&self) -> impl Future<Output = Result<Vec<IdlCacheRow>>> + Send;
+}
+
+/// One persisted IDL lookup. Plain strings, so the store doesn't depend on
+/// the IDL crate; ingest converts.
+#[derive(Debug, Clone, PartialEq)]
+pub struct IdlCacheRow {
+    pub program_id: String,
+    /// `found` or `missing`.
+    pub fetch_status: String,
+    pub location: Option<String>,
+    pub idl_format: Option<String>,
+    pub idl_json: Option<serde_json::Value>,
+    /// Seconds since the fetch.
+    pub age_secs: u64,
 }
 
 #[derive(Debug, Clone)]
@@ -171,5 +197,55 @@ impl Store for PgStore {
         .execute(&self.pool)
         .await?;
         Ok(())
+    }
+
+    async fn upsert_idl(&self, row: &IdlCacheRow) -> Result<()> {
+        sqlx::query(
+            "INSERT INTO idl_cache (program_id, fetch_status, location, idl_format, idl_json, fetched_at)
+             VALUES ($1, $2, $3, $4, $5, now() - make_interval(secs => $6))
+             ON CONFLICT (program_id) DO UPDATE SET
+                fetch_status = EXCLUDED.fetch_status, location = EXCLUDED.location,
+                idl_format = EXCLUDED.idl_format, idl_json = EXCLUDED.idl_json,
+                fetched_at = EXCLUDED.fetched_at",
+        )
+        .bind(&row.program_id)
+        .bind(&row.fetch_status)
+        .bind(&row.location)
+        .bind(&row.idl_format)
+        .bind(&row.idl_json)
+        .bind(row.age_secs as f64)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    async fn load_idls(&self) -> Result<Vec<IdlCacheRow>> {
+        #[derive(sqlx::FromRow)]
+        struct Row {
+            program_id: String,
+            fetch_status: String,
+            location: Option<String>,
+            idl_format: Option<String>,
+            idl_json: Option<serde_json::Value>,
+            age: f64,
+        }
+        let rows: Vec<Row> = sqlx::query_as(
+            "SELECT program_id, fetch_status, location, idl_format, idl_json,
+                    GREATEST(extract(epoch FROM now() - fetched_at), 0)::float8 AS age
+             FROM idl_cache",
+        )
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows
+            .into_iter()
+            .map(|r| IdlCacheRow {
+                program_id: r.program_id,
+                fetch_status: r.fetch_status,
+                location: r.location,
+                idl_format: r.idl_format,
+                idl_json: r.idl_json,
+                age_secs: r.age as u64,
+            })
+            .collect())
     }
 }

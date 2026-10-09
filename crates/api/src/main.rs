@@ -34,6 +34,13 @@ enum Command {
         #[arg(long, env = "INGEST_STREAM", default_value = "default")]
         stream: String,
     },
+    /// Serve the JSON API.
+    Serve {
+        #[arg(long, env = "DATABASE_URL", hide_env_values = true)]
+        database_url: String,
+        #[arg(long, env = "BIND", default_value = "127.0.0.1:8080")]
+        bind: std::net::SocketAddr,
+    },
 }
 
 #[tokio::main]
@@ -45,7 +52,7 @@ async fn main() -> anyhow::Result<()> {
         // Plain text when logging to a file or pipe.
         .with_ansi(std::io::stdout().is_terminal())
         .with_env_filter(
-            EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")),
+            EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info,sqlx=warn")),
         )
         .init();
 
@@ -69,6 +76,18 @@ async fn main() -> anyhow::Result<()> {
                 failscope_ingest::run(config, Arc::new(store), Arc::new(idls), shutdown_signal())
                     .await?;
             tracing::info!(?stats, "ingest stopped");
+        }
+        Command::Serve { database_url, bind } => {
+            let store = PgStore::connect(&database_url)
+                .await
+                .context("connecting to Postgres")?;
+            let listener = tokio::net::TcpListener::bind(bind)
+                .await
+                .with_context(|| format!("binding {bind}"))?;
+            tracing::info!(%bind, "serving API");
+            axum::serve(listener, failscope_api::http::router(Arc::new(store)))
+                .with_graceful_shutdown(shutdown_signal())
+                .await?;
         }
     }
     Ok(())

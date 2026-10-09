@@ -18,6 +18,23 @@ pub enum IdlLocation {
     ProgramMetadata,
 }
 
+impl IdlLocation {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            IdlLocation::Legacy => "legacy",
+            IdlLocation::ProgramMetadata => "program_metadata",
+        }
+    }
+
+    pub fn parse(s: &str) -> Option<Self> {
+        match s {
+            "legacy" => Some(IdlLocation::Legacy),
+            "program_metadata" => Some(IdlLocation::ProgramMetadata),
+            _ => None,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(tag = "kind", content = "spec", rename_all = "snake_case")]
 pub enum IdlFormat {
@@ -25,6 +42,24 @@ pub enum IdlFormat {
     Legacy,
     /// 0.30+ spec: top-level `address` and `metadata.spec`.
     Spec(String),
+}
+
+impl IdlFormat {
+    /// `legacy` or `spec:<version>`.
+    pub fn to_text(&self) -> String {
+        match self {
+            IdlFormat::Legacy => "legacy".to_string(),
+            IdlFormat::Spec(v) => format!("spec:{v}"),
+        }
+    }
+
+    pub fn parse(s: &str) -> Option<Self> {
+        match s.split_once(':') {
+            None if s == "legacy" => Some(IdlFormat::Legacy),
+            Some(("spec", v)) => Some(IdlFormat::Spec(v.to_string())),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -102,6 +137,16 @@ pub async fn fetch_idl<S: AccountSource>(
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn text_round_trips() {
+        for f in [IdlFormat::Legacy, IdlFormat::Spec("0.1.0".to_string())] {
+            assert_eq!(IdlFormat::parse(&f.to_text()), Some(f));
+        }
+        for l in [IdlLocation::Legacy, IdlLocation::ProgramMetadata] {
+            assert_eq!(IdlLocation::parse(l.as_str()), Some(l));
+        }
+    }
 
     #[test]
     fn formats() {

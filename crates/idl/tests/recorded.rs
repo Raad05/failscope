@@ -47,7 +47,7 @@ async fn legacy_location_with_legacy_format() {
 
     // Legacy-format errors use the same shape, so the decoder reads them as is.
     let cache = IdlCache::new(recorded_accounts());
-    assert_eq!(cache.ensure(MARINADE).await, FetchStatus::Found);
+    assert_eq!(cache.ensure(MARINADE).await.status, FetchStatus::Found);
     let first = &idl.json["errors"][0];
     let code = u32::try_from(first["code"].as_u64().unwrap()).unwrap();
     let looked_up = cache.idl_error(MARINADE, code).unwrap();
@@ -65,9 +65,13 @@ async fn program_without_idl_is_none() {
 async fn errors_decode_via_on_chain_idl_without_logs() {
     let cache = IdlCache::new(recorded_accounts());
     for program in [FAIL_TARGET, FAIL_CALLEE, JUPITER] {
-        assert_eq!(cache.ensure(program).await, FetchStatus::Found, "{program}");
+        assert_eq!(
+            cache.ensure(program).await.status,
+            FetchStatus::Found,
+            "{program}"
+        );
     }
-    assert_eq!(cache.ensure(NO_IDL).await, FetchStatus::Missing);
+    assert_eq!(cache.ensure(NO_IDL).await.status, FetchStatus::Missing);
 
     let cases = [
         ("devnet_custom_error", DecodeSource::Idl, "AlwaysFails"),

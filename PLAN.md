@@ -157,7 +157,7 @@ Instructions that each fail deliberately in a distinct way:
   - top error names for a program
   - failure counts over time (bucketed)
   - decode coverage by `decode_source`
-- axum endpoints with simple pagination, JSON only, plus OpenAPI or a documented README table.
+- axum endpoints with simple pagination, JSON only, plus OpenAPI or a documented README table. (Done: `docs/api.md`, D20.)
 
 ### M7: Dashboard
 - One good page: top failing programs and error names over the last 24h, a time-series chart, and a program detail view. Keep it plain (static HTML + a chart lib, or htmx).

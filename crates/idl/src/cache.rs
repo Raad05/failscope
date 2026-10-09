@@ -51,6 +51,15 @@ pub struct CacheEntry {
     errors: IdlErrorTable,
 }
 
+/// Result of [`IdlCache::ensure`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Ensured {
+    pub status: FetchStatus,
+    /// True if this call fetched and stored a new found/missing result,
+    /// i.e. something worth persisting.
+    pub refreshed: bool,
+}
+
 pub struct IdlCache<S> {
     source: S,
     ttl: CacheTtl,
@@ -72,10 +81,13 @@ impl<S: AccountSource> IdlCache<S> {
 
     /// Makes sure `program_id` has a fresh entry, fetching if needed.
     /// Concurrent calls for the same program may both fetch; the last wins.
-    pub async fn ensure(&self, program_id: &str) -> FetchStatus {
+    pub async fn ensure(&self, program_id: &str) -> Ensured {
         if let Some(entry) = self.entry(program_id) {
             if entry.fetched_at.elapsed() < self.ttl_for(entry.status) {
-                return entry.status;
+                return Ensured {
+                    status: entry.status,
+                    refreshed: false,
+                };
             }
         }
 
@@ -107,7 +119,10 @@ impl<S: AccountSource> IdlCache<S> {
                     .checked_sub(self.ttl.found.saturating_sub(self.ttl.error))
                     .unwrap_or_else(Instant::now);
             }
-            return FetchStatus::Found;
+            return Ensured {
+                status: FetchStatus::Found,
+                refreshed: false,
+            };
         }
         entries.insert(
             program_id.to_string(),
@@ -118,7 +133,34 @@ impl<S: AccountSource> IdlCache<S> {
                 errors,
             },
         );
-        status
+        Ensured {
+            status,
+            refreshed: status != FetchStatus::Error,
+        }
+    }
+
+    /// Adds an entry fetched `age` ago (e.g. loaded from the database at
+    /// startup). TTLs count from the original fetch time.
+    pub fn seed(&self, program_id: &str, status: FetchStatus, idl: Option<Idl>, age: Duration) {
+        let mut errors = IdlErrorTable::new();
+        if let Some(idl) = &idl {
+            if let Err(e) = errors.add_idl(program_id, &idl.json) {
+                tracing::warn!(program_id, error = %e, "seeded IDL has an unreadable errors array");
+            }
+        }
+        let now = Instant::now();
+        self.entries
+            .write()
+            .unwrap_or_else(|e| e.into_inner())
+            .insert(
+                program_id.to_string(),
+                CacheEntry {
+                    status,
+                    idl: idl.map(Arc::new),
+                    fetched_at: now.checked_sub(age).unwrap_or(now),
+                    errors,
+                },
+            );
     }
 
     pub fn entry(&self, program_id: &str) -> Option<CacheEntry> {

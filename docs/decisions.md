@@ -81,6 +81,17 @@ Record each decision and each resolved "verify" item: what was decided, why, sou
 - No `query!` macros, so building and CI never need a database or a committed `.sqlx/` cache. The cost is no compile-time SQL checking. `crates/store/tests/postgres.rs` runs every query against a real Postgres instead. CI has a Postgres service and `FAILSCOPE_REQUIRE_DB=1`, so those tests can't skip there.
 - `block_time` is backfilled with `UPDATE … WHERE slot = $1 AND block_time IS NULL` when block meta arrives, because transaction updates don't carry it.
 
+### D20: API shape (M6, 2026-10-09)
+- JSON only, documented in `docs/api.md` rather than generated OpenAPI. That avoids a schema-generation dependency for seven endpoints.
+- `hours` windows (max 720), `limit`/`offset` paging (max 500). Time series fill empty buckets with zeros via `generate_series`, so charts have no holes. `bucket=minute` is capped at 24h (≤ 1440 points).
+- Timestamps are formatted as RFC 3339 by Postgres (`to_char … AT TIME ZONE 'UTC'`), with no date library in Rust. Buckets are truncated in UTC.
+- Handlers are generic over the store's `Queries` trait. Bad parameters are rejected before any query runs (tested with a fake store that panics if called), and every rejection uses the same JSON error shape.
+- Don't use `#[serde(flatten)]` on query-param structs: flatten buffers values as strings and numeric fields then fail to parse (it broke `/api/failures?limit=`).
+
+### D21: IDL cache persisted in `idl_cache` (M6)
+- Ingest loads it at startup (`IdlCache::seed`, keeping each entry's original age so TTLs still apply) and writes a row whenever `ensure` fetched a new found/missing result. Errors aren't persisted, since they're retried within minutes.
+- The store has its own plain-string row type, so `failscope-store` doesn't depend on `failscope-idl`.
+
 ## Runtime findings (observed, not assumed)
 
 Observed on Agave 3.1.14 (LiteSVM 0.10 and devnet, identical logs):

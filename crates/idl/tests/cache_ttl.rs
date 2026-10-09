@@ -52,8 +52,8 @@ fn setup() -> (IdlCache<Flaky>, Flaky) {
 #[tokio::test(start_paused = true)]
 async fn found_is_cached_until_ttl() {
     let (cache, source) = setup();
-    assert_eq!(cache.ensure(FAIL_TARGET).await, FetchStatus::Found);
-    assert_eq!(cache.ensure(FAIL_TARGET).await, FetchStatus::Found);
+    assert_eq!(cache.ensure(FAIL_TARGET).await.status, FetchStatus::Found);
+    assert_eq!(cache.ensure(FAIL_TARGET).await.status, FetchStatus::Found);
     assert_eq!(source.calls.load(Ordering::SeqCst), 1);
     tokio::time::advance(Duration::from_secs(601)).await;
     cache.ensure(FAIL_TARGET).await;
@@ -63,7 +63,7 @@ async fn found_is_cached_until_ttl() {
 #[tokio::test(start_paused = true)]
 async fn missing_is_cached_with_its_own_ttl() {
     let (cache, source) = setup();
-    assert_eq!(cache.ensure(NO_IDL).await, FetchStatus::Missing);
+    assert_eq!(cache.ensure(NO_IDL).await.status, FetchStatus::Missing);
     cache.ensure(NO_IDL).await;
     assert_eq!(source.calls.load(Ordering::SeqCst), 1);
     tokio::time::advance(Duration::from_secs(61)).await;
@@ -76,20 +76,20 @@ async fn missing_is_cached_with_its_own_ttl() {
 async fn errors_retry_soon_and_never_drop_a_known_idl() {
     let (cache, source) = setup();
     source.failing.store(true, Ordering::SeqCst);
-    assert_eq!(cache.ensure(FAIL_TARGET).await, FetchStatus::Error);
+    assert_eq!(cache.ensure(FAIL_TARGET).await.status, FetchStatus::Error);
     cache.ensure(FAIL_TARGET).await;
     assert_eq!(source.calls.load(Ordering::SeqCst), 1);
     tokio::time::advance(Duration::from_secs(11)).await;
 
     source.failing.store(false, Ordering::SeqCst);
-    assert_eq!(cache.ensure(FAIL_TARGET).await, FetchStatus::Found);
+    assert_eq!(cache.ensure(FAIL_TARGET).await.status, FetchStatus::Found);
     assert!(cache.idl_error(FAIL_TARGET, 6000).is_some());
 
     // Refresh fails after expiry: the found IDL keeps serving, and the next
     // retry comes after the error TTL rather than the found TTL.
     tokio::time::advance(Duration::from_secs(601)).await;
     source.failing.store(true, Ordering::SeqCst);
-    assert_eq!(cache.ensure(FAIL_TARGET).await, FetchStatus::Found);
+    assert_eq!(cache.ensure(FAIL_TARGET).await.status, FetchStatus::Found);
     assert!(cache.idl_error(FAIL_TARGET, 6000).is_some());
     let calls = source.calls.load(Ordering::SeqCst);
     cache.ensure(FAIL_TARGET).await;
@@ -101,4 +101,30 @@ async fn errors_retry_soon_and_never_drop_a_known_idl() {
     tokio::time::advance(Duration::from_secs(11)).await;
     cache.ensure(FAIL_TARGET).await;
     assert_eq!(source.calls.load(Ordering::SeqCst), calls + 1);
+}
+
+#[tokio::test(start_paused = true)]
+async fn refreshed_flags_new_results_and_seed_respects_age() {
+    let (cache, source) = setup();
+    let first = cache.ensure(FAIL_TARGET).await;
+    assert!(first.refreshed);
+    assert!(
+        !cache.ensure(FAIL_TARGET).await.refreshed,
+        "cache hit reported as refresh"
+    );
+
+    source.failing.store(true, Ordering::SeqCst);
+    let (fresh, _) = setup();
+    fresh.seed(NO_IDL, FetchStatus::Missing, None, Duration::from_secs(30));
+    // Seeded 30s ago with a 60s missing TTL: still fresh, no fetch.
+    assert_eq!(
+        fresh.ensure(NO_IDL).await,
+        failscope_idl::Ensured {
+            status: FetchStatus::Missing,
+            refreshed: false
+        }
+    );
+    // Seeded past its TTL: refetched.
+    fresh.seed(NO_IDL, FetchStatus::Missing, None, Duration::from_secs(61));
+    assert!(fresh.ensure(NO_IDL).await.refreshed);
 }

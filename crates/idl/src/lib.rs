@@ -16,7 +16,7 @@ pub use address::{
     legacy_idl_address, metadata_idl_address, parse_address, METADATA_IDL_SEED,
     PROGRAM_METADATA_PROGRAM,
 };
-pub use cache::{CacheEntry, CacheTtl, FetchStatus, IdlCache};
+pub use cache::{CacheEntry, CacheTtl, Ensured, FetchStatus, IdlCache};
 pub use fetch::{detect_format, fetch_idl, Idl, IdlFormat, IdlLocation};
 pub use source::{AccountData, AccountSource, RpcAccount, RpcAccountSource, StaticAccounts};
 

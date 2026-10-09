@@ -135,3 +135,50 @@ async fn gaps_are_recorded() {
         .unwrap();
     assert_eq!(n, 1);
 }
+
+#[tokio::test]
+async fn idl_cache_round_trips_and_keeps_age() {
+    use failscope_store::IdlCacheRow;
+    let Some(store) = store().await else { return };
+    let found = IdlCacheRow {
+        program_id: unique("prog"),
+        fetch_status: "found".to_string(),
+        location: Some("program_metadata".to_string()),
+        idl_format: Some("spec:0.1.0".to_string()),
+        idl_json: Some(serde_json::json!({"errors": [{"code": 6000, "name": "A"}]})),
+        age_secs: 120,
+    };
+    let missing = IdlCacheRow {
+        program_id: unique("none"),
+        fetch_status: "missing".to_string(),
+        location: None,
+        idl_format: None,
+        idl_json: None,
+        age_secs: 0,
+    };
+    store.upsert_idl(&found).await.unwrap();
+    store.upsert_idl(&missing).await.unwrap();
+    // Upsert replaces.
+    store
+        .upsert_idl(&IdlCacheRow {
+            age_secs: 300,
+            ..found.clone()
+        })
+        .await
+        .unwrap();
+
+    let rows = store.load_idls().await.unwrap();
+    let got = rows
+        .iter()
+        .find(|r| r.program_id == found.program_id)
+        .unwrap();
+    assert_eq!(got.idl_json, found.idl_json);
+    assert_eq!(got.location, found.location);
+    assert!((300..310).contains(&got.age_secs), "age {}", got.age_secs);
+    let got_missing = rows
+        .iter()
+        .find(|r| r.program_id == missing.program_id)
+        .unwrap();
+    assert_eq!(got_missing.fetch_status, "missing");
+    assert_eq!(got_missing.idl_json, None);
+}
