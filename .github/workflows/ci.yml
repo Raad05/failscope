@@ -12,6 +12,20 @@ jobs:
   offchain:
     name: off-chain (crates/)
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: failscope
+          POSTGRES_PASSWORD: failscope
+          POSTGRES_DB: failscope
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U failscope"
+          --health-interval 2s --health-timeout 3s --health-retries 20
+    env:
+      DATABASE_URL: postgres://failscope:failscope@localhost:5432/failscope
+      FAILSCOPE_REQUIRE_DB: "1"
     steps:
       - uses: actions/checkout@v4
       # rustup reads rust-toolchain.toml and installs the pinned toolchain + components.

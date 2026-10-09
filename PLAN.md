@@ -147,10 +147,12 @@ Instructions that each fail deliberately in a distinct way:
 - Reconnect with backoff, resume via `from_slot` from the last processed slot, bounded channels for backpressure, graceful shutdown.
 - Commitment: `confirmed` (lower latency than `finalized`; reorg risk is negligible in practice). Document why in `docs/decisions.md`.
 - Idempotent inserts (signature pk, `ON CONFLICT DO NOTHING`).
-- Done when: running against devnet (or a provider endpoint) inserts decoded failures into the DB; killing the connection resumes via `from_slot` with no duplicates when inside the provider's replay window, and otherwise records the missed slot range in `ingest_gaps`.
+- Done when: running against a Yellowstone endpoint (local validator + plugin, per D17; a devnet/mainnet provider only changes the endpoint) inserts decoded failures into the DB; killing the connection resumes via `from_slot` with no duplicates when inside the replay window, and otherwise records the missed slot range in `ingest_gaps`. Verified by `dev/e2e-resume.sh` and `dev/e2e-gap.sh`.
 
 ### M6: Store and API
-- Migrations, insert path, and the key queries:
+- (M5 already added the Postgres store: migrations, idempotent insert, cursor, gaps.)
+- Persist the IDL cache (`idl_cache` table).
+- The key queries:
   - top failing programs, last N hours
   - top error names for a program
   - failure counts over time (bucketed)

@@ -1,0 +1,100 @@
+{
+  "blockTime": 1791470368,
+  "meta": {
+    "computeUnitsConsumed": 4787,
+    "costUnits": 5865,
+    "err": {
+      "InstructionError": [
+        0,
+        {
+          "Custom": 6000
+        }
+      ]
+    },
+    "fee": 5000,
+    "innerInstructions": [
+      {
+        "index": 0,
+        "instructions": [
+          {
+            "accounts": [
+              0
+            ],
+            "data": "YMovLe4Qdpw",
+            "programIdIndex": 2,
+            "stackHeight": 2
+          }
+        ]
+      }
+    ],
+    "loadedAddresses": {
+      "readonly": [],
+      "writable": []
+    },
+    "logMessages": [
+      "Program 6MzbWCZgmdSrBwcUVypa4aGNKdck6r49jV7Y48AhPNey invoke [1]",
+      "Program log: Instruction: FailNestedCpi",
+      "Program BCUANLyTtzvYGheyo7ymmHhDDZQ74WGjwsC8Rv3VFDPb invoke [2]",
+      "Program log: Instruction: FailInner",
+      "Program log: AnchorError thrown in programs/fail_callee/src/lib.rs:15. Error Code: CalleeAlwaysFails. Error Number: 6000. Error Message: fail_callee always fails when invoked.",
+      "Program BCUANLyTtzvYGheyo7ymmHhDDZQ74WGjwsC8Rv3VFDPb consumed 2197 of 197410 compute units",
+      "Program BCUANLyTtzvYGheyo7ymmHhDDZQ74WGjwsC8Rv3VFDPb failed: custom program error: 0x1770",
+      "Program 6MzbWCZgmdSrBwcUVypa4aGNKdck6r49jV7Y48AhPNey consumed 4787 of 200000 compute units",
+      "Program 6MzbWCZgmdSrBwcUVypa4aGNKdck6r49jV7Y48AhPNey failed: custom program error: 0x1770"
+    ],
+    "postBalances": [
+      499999999998725040,
+      1141440,
+      1141440
+    ],
+    "postTokenBalances": [],
+    "preBalances": [
+      499999999998730040,
+      1141440,
+      1141440
+    ],
+    "preTokenBalances": [],
+    "rewards": [],
+    "status": {
+      "Err": {
+        "InstructionError": [
+          0,
+          {
+            "Custom": 6000
+          }
+        ]
+      }
+    }
+  },
+  "slot": 1024,
+  "transaction": {
+    "message": {
+      "accountKeys": [
+        "Dx7RPXNY6qwLY7352Wh5NyatNTSwssmcFiN4Bphs14g2",
+        "6MzbWCZgmdSrBwcUVypa4aGNKdck6r49jV7Y48AhPNey",
+        "BCUANLyTtzvYGheyo7ymmHhDDZQ74WGjwsC8Rv3VFDPb"
+      ],
+      "header": {
+        "numReadonlySignedAccounts": 0,
+        "numReadonlyUnsignedAccounts": 2,
+        "numRequiredSignatures": 1
+      },
+      "instructions": [
+        {
+          "accounts": [
+            0,
+            2
+          ],
+          "data": "ZyXk8eyu68N",
+          "programIdIndex": 1,
+          "stackHeight": 1
+        }
+      ],
+      "recentBlockhash": "H4hbBokUnh54jTRfTSnK3jFFd2xNyXJuXrnq4RjNKqQq"
+    },
+    "signatures": [
+      "4DiBbKCQKqPGtipeyJ2KUoJk37weu24VysaPoXirmu3Pk17ZHaNZohg9TueuAVSc8M6CCQkpJ22FyN1oiGjSth79"
+    ]
+  },
+  "version": "legacy"
+}

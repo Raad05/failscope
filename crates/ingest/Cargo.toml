@@ -8,6 +8,22 @@ license.workspace = true
 publish = false
 
 [dependencies]
+bincode.workspace = true
+bs58.workspace = true
+failscope-decoder.workspace = true
+failscope-idl.workspace = true
+failscope-store.workspace = true
+futures.workspace = true
+thiserror.workspace = true
+tokio = { workspace = true, features = ["macros", "rt-multi-thread", "signal"] }
+tracing.workspace = true
+yellowstone-grpc-client.workspace = true
+yellowstone-grpc-proto.workspace = true
+
+[dev-dependencies]
+failscope-decoder.workspace = true
+reqwest.workspace = true
+serde_json.workspace = true
 
 [lints]
 workspace = true

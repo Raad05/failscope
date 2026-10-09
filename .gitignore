@@ -17,3 +17,6 @@ test-ledger
 
 # Local config with secrets
 .env
+
+# Local tooling (e.g. Yellowstone plugin build)
+.local/

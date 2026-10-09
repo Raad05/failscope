@@ -1,0 +1,78 @@
+{
+  "blockTime": 1791470365,
+  "meta": {
+    "computeUnitsConsumed": 1757,
+    "costUnits": 2821,
+    "err": {
+      "InstructionError": [
+        0,
+        {
+          "Custom": 6001
+        }
+      ]
+    },
+    "fee": 5000,
+    "innerInstructions": [],
+    "loadedAddresses": {
+      "readonly": [],
+      "writable": []
+    },
+    "logMessages": [
+      "Program 6MzbWCZgmdSrBwcUVypa4aGNKdck6r49jV7Y48AhPNey invoke [1]",
+      "Program log: Instruction: FailOverflowChecked",
+      "Program log: AnchorError occurred. Error Code: CheckedOverflow. Error Number: 6001. Error Message: Checked arithmetic overflowed.",
+      "Program 6MzbWCZgmdSrBwcUVypa4aGNKdck6r49jV7Y48AhPNey consumed 1757 of 200000 compute units",
+      "Program 6MzbWCZgmdSrBwcUVypa4aGNKdck6r49jV7Y48AhPNey failed: custom program error: 0x1771"
+    ],
+    "postBalances": [
+      499999999998740040,
+      1141440
+    ],
+    "postTokenBalances": [],
+    "preBalances": [
+      499999999998745040,
+      1141440
+    ],
+    "preTokenBalances": [],
+    "rewards": [],
+    "status": {
+      "Err": {
+        "InstructionError": [
+          0,
+          {
+            "Custom": 6001
+          }
+        ]
+      }
+    }
+  },
+  "slot": 1017,
+  "transaction": {
+    "message": {
+      "accountKeys": [
+        "Dx7RPXNY6qwLY7352Wh5NyatNTSwssmcFiN4Bphs14g2",
+        "6MzbWCZgmdSrBwcUVypa4aGNKdck6r49jV7Y48AhPNey"
+      ],
+      "header": {
+        "numReadonlySignedAccounts": 0,
+        "numReadonlyUnsignedAccounts": 1,
+        "numRequiredSignatures": 1
+      },
+      "instructions": [
+        {
+          "accounts": [
+            0
+          ],
+          "data": "DuA1Rg91NWK2pNNRXVYz1d",
+          "programIdIndex": 1,
+          "stackHeight": 1
+        }
+      ],
+      "recentBlockhash": "3rY9f7JoRENAtbDrAbcuCoRcPkNeD5yUMLbr1xFYUSUp"
+    },
+    "signatures": [
+      "4oNfTu6EniFAsxJtdcWC8ZKiWtMrDxRrnmmL8AB5z5mFmCM3ycYdaKBDpUEfTSFj28mydKevZa75H64JZb4QkTbk"
+    ]
+  },
+  "version": "legacy"
+}

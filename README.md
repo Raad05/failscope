@@ -4,7 +4,7 @@
 
 _Screenshot: coming in M7._
 
-**Status:** M4 done (on-chain IDL fetch + cache; errors decode from on-chain IDLs). See [PLAN.md](PLAN.md) for the roadmap.
+**Status:** M5 done (Yellowstone ingest into Postgres, with resume and gap tracking verified end to end). See [PLAN.md](PLAN.md) for the roadmap.
 
 ## Failed vs dropped
 
@@ -46,7 +46,8 @@ Yellowstone gRPC ──> ingest ──> decoder ──> store (Postgres) ──>
    5. `runtime`: non-`Custom` errors, refined by the `failed:` reason (`ProgramPanicked`, `ComputeUnitsExceeded`).
    6. `unknown`: code and program are kept; the name is not.
 3. **IDLs** come from `crates/idl`, which reads both on-chain locations in one RPC call: the legacy Anchor IDL account (Anchor < 1.0, most mainnet programs) and the Program Metadata account (Anchor ≥ 1.0). Both IDL formats are handled. A TTL cache, which also caches "no IDL", feeds the decoder.
-4. **Derive** `cu_requested` and `priority_fee` from compute-budget instructions using agave 3.1's rules. Tests check that `5000 × signatures + priority_fee` equals the charged fee for every fixture.
+4. **Ingest** (`crates/ingest`) subscribes to failed, non-vote transactions at `confirmed` commitment, plus block meta for `block_time`. A bounded channel gives backpressure. On reconnect it resumes from a slot cursor via `from_slot`; slots the server can no longer replay are recorded in `ingest_gaps` instead of being silently skipped. Both directions were tested against a local validator: hard kill, graceful stop, and exceeding the replay window (`dev/e2e-*.sh`).
+5. **Derive** `cu_requested` and `priority_fee` from compute-budget instructions using agave 3.1's rules. Tests check that `5000 × signatures + priority_fee` equals the charged fee for every fixture.
 
 ## Companion program failure modes
 
@@ -73,8 +74,13 @@ _Numbers from a real stream come after M5._ On the 12 fixtures (`cargo run -p fa
 
 Requirements: Rust (toolchains are pinned per workspace by `rust-toolchain.toml`), and for `onchain/` the Solana CLI and Anchor CLI 1.2.
 
+Local stack (validator with the Yellowstone plugin, Postgres): see [dev/README.md](dev/README.md).
+
 ```sh
 cp .env.example .env
+docker compose up -d db          # Postgres
+dev/localnet.sh                  # local validator + Yellowstone gRPC
+cargo run -p failscope-api -- ingest
 
 # off-chain workspace
 cargo fmt --all --check

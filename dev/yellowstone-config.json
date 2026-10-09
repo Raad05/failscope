@@ -1,0 +1,10 @@
+{
+  "libpath": "../.local/yellowstone-grpc/target/release/libyellowstone_grpc_geyser.so",
+  "log": { "level": "info" },
+  "grpc": {
+    "address": "127.0.0.1:10000",
+    "channel_capacity": "100_000",
+    "replay_stored_slots": 5000,
+    "x_token": null
+  }
+}

@@ -1,0 +1,81 @@
+{
+  "blockTime": 1791470363,
+  "meta": {
+    "computeUnitsConsumed": 1950,
+    "costUnits": 3012,
+    "err": {
+      "InstructionError": [
+        0,
+        {
+          "Custom": 3010
+        }
+      ]
+    },
+    "fee": 5000,
+    "innerInstructions": [],
+    "loadedAddresses": {
+      "readonly": [],
+      "writable": []
+    },
+    "logMessages": [
+      "Program 6MzbWCZgmdSrBwcUVypa4aGNKdck6r49jV7Y48AhPNey invoke [1]",
+      "Program log: Instruction: FailMissingSigner",
+      "Program log: AnchorError caused by account: authority. Error Code: AccountNotSigner. Error Number: 3010. Error Message: The given account did not sign.",
+      "Program 6MzbWCZgmdSrBwcUVypa4aGNKdck6r49jV7Y48AhPNey consumed 1950 of 200000 compute units",
+      "Program 6MzbWCZgmdSrBwcUVypa4aGNKdck6r49jV7Y48AhPNey failed: custom program error: 0xbc2"
+    ],
+    "postBalances": [
+      499999999998750040,
+      1141440,
+      0
+    ],
+    "postTokenBalances": [],
+    "preBalances": [
+      499999999998755040,
+      1141440,
+      0
+    ],
+    "preTokenBalances": [],
+    "rewards": [],
+    "status": {
+      "Err": {
+        "InstructionError": [
+          0,
+          {
+            "Custom": 3010
+          }
+        ]
+      }
+    }
+  },
+  "slot": 1012,
+  "transaction": {
+    "message": {
+      "accountKeys": [
+        "Dx7RPXNY6qwLY7352Wh5NyatNTSwssmcFiN4Bphs14g2",
+        "6MzbWCZgmdSrBwcUVypa4aGNKdck6r49jV7Y48AhPNey",
+        "CTfScnmoHWPMHVFe6LPQnG6pvBGDxiNejpLpL6v5PwuZ"
+      ],
+      "header": {
+        "numReadonlySignedAccounts": 0,
+        "numReadonlyUnsignedAccounts": 2,
+        "numRequiredSignatures": 1
+      },
+      "instructions": [
+        {
+          "accounts": [
+            2
+          ],
+          "data": "M1sq3aSWJTt",
+          "programIdIndex": 1,
+          "stackHeight": 1
+        }
+      ],
+      "recentBlockhash": "5md5iVPe9xQbyrprTwGWYPnQeiAPH8V3xiZRKvd1rSmS"
+    },
+    "signatures": [
+      "2sAsoqnXg7f5dTKuxJpzU5UiTy1PKNGzn5QLKrKZsB434MejD7bw1FuYr4FMJVXpeB7qFwSq8HGJDMJdFvLqiq4G"
+    ]
+  },
+  "version": "legacy"
+}

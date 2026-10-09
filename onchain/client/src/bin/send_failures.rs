@@ -3,7 +3,9 @@
 //! and writes the signatures to `fixtures/signatures.json`.
 //!
 //! Usage: `cargo run -p fail_client --bin send_failures [-- <case slug>...]`
-//! Env: `RPC_URL` (default devnet), `KEYPAIR` (default ~/.config/solana/id.json).
+//! Env: `RPC_URL` (default devnet), `KEYPAIR` (default ~/.config/solana/id.json),
+//! `SIGNATURES_OUT` (default: `fixtures/signatures.json` on devnet only, so
+//! local runs never overwrite the recorded devnet signatures).
 
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
@@ -95,10 +97,18 @@ fn main() -> Result<()> {
         });
     }
 
-    let out = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/signatures.json");
-    std::fs::create_dir_all(out.parent().context("fixtures path has no parent")?)?;
-    std::fs::write(&out, serde_json::to_string_pretty(&sent)? + "\n")?;
-    println!("wrote {}", out.display());
+    let out = match std::env::var("SIGNATURES_OUT") {
+        Ok(path) => Some(PathBuf::from(path)),
+        Err(_) if url.contains("devnet") => {
+            Some(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/signatures.json"))
+        }
+        Err(_) => None,
+    };
+    if let Some(out) = out {
+        std::fs::create_dir_all(out.parent().context("output path has no parent")?)?;
+        std::fs::write(&out, serde_json::to_string_pretty(&sent)? + "\n")?;
+        println!("wrote {}", out.display());
+    }
     Ok(())
 }
 

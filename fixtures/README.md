@@ -80,8 +80,12 @@ Raw `getAccountInfo` results (base64), named by account address, used by `crates
 | `9jWC3E…` | Marinade | legacy | legacy |
 | `FDDfot…` | Jupiter v6 | Program Metadata | _none (null)_ |
 
+## Yellowstone captures (`grpc/`)
+
+Raw `SubscribeUpdate` protobuf messages (`<signature>.pb`) for the 8 companion-program failures, captured from a local validator running the Yellowstone plugin, each paired with the same transaction from JSON-RPC (`<signature>.rpc.json`). `crates/ingest/tests/adapters_agree.rs` checks that both adapters produce identical decoder input. Re-capture with `cargo run -p failscope-ingest --example capture -- 8` while sending failures to localnet.
+
 ## Not covered yet
 
 - **Truncated logs:** none found in about 120 scanned mainnet failures. `crates/decoder/tests/degraded.rs` builds these cases from real fixtures (truncated, Anchor lines stripped, logs missing), and `tests/props.rs` cuts every fixture's logs at random points.
 - **SPL Token as the failing program:** none found in the samples scanned (public RPC rate limits cut scans short). Native decoding is covered by the System program case.
-- **Yellowstone gRPC capture:** needs a streaming endpoint. Moved to M5.
+- **Yellowstone gRPC capture:** done in M5, see below.

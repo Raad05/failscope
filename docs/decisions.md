@@ -10,7 +10,7 @@ Record each decision and each resolved "verify" item: what was decided, why, sou
 
 ### D2: Commitment = `confirmed`
 - **Why:** Lower latency than `finalized`. Reorg risk at `confirmed` is negligible in practice, and duplicate/orphan handling is idempotent anyway.
-- **When:** M5. Revisit if orphaned rows are observed.
+- **When:** implemented in M5 (`SubscribeRequest.commitment`). Revisit if orphaned rows are observed.
 
 ### D3: Attribution = first `failed:` log line, cross-checked with inner instructions
 - **Why:** Frames emit `failed:` while unwinding outward, so the first one is innermost. When logs are truncated, attribution falls back to the root program with `attribution_confidence = low`.
@@ -64,6 +64,23 @@ Record each decision and each resolved "verify" item: what was decided, why, sou
 - The cache implements the decoder's `ErrorLookup`: callers `ensure()` the failing program (async), then decode synchronously. The decoder stays pure.
 - Persisting the cache (`idl_cache` table) is M6.
 
+### D17: Local validator + Yellowstone plugin for ingest development (M5, 2026-10-09)
+- The public devnet RPC has no Yellowstone gRPC. A local `solana-test-validator` with the plugin is free, deterministic, and can be broken on purpose (kill the client, shrink the replay window). It speaks the same protocol a hosted provider does, so moving to devnet or mainnet only changes `YELLOWSTONE_ENDPOINT`.
+- The plugin is built from `v12.1.0+solana.3.1.10` with its Agave pins bumped to `=3.1.14`, using Rust 1.86 like Agave 3.1.14. Client crates are `yellowstone-grpc-client`/`-proto` `=12.1.0`, which use Solana 3.x crates like the decoder. Newer releases target Agave 4.x.
+
+### D18: Resume and gap semantics (M5)
+- **Cursor** = highest slot whose block meta the consumer has processed. Events are handled in order, so every failure up to the cursor is stored. It's saved every 2s and on shutdown, and never moves backwards.
+- **On (re)connect**, the client asks for `from_slot = cursor`. The cursor slot is replayed again, which is harmless because inserts are idempotent (signature PK). After a SIGKILL the cursor can lag by one flush interval, and that overlap is just duplicates.
+- **Gaps** are recorded in `ingest_gaps`, never silently skipped:
+  - if replay info says the oldest stored slot is newer than the cursor: record `cursor+1 .. oldest-1` and start there;
+  - if the server refuses `from_slot` (`broadcast from X is not available, last available: Y`): record the gap and retry immediately from Y;
+  - if `from_slot` is unsupported: stream live, and record from the cursor up to the first slot received.
+- **Verified end to end** (`dev/e2e-resume.sh`, `dev/e2e-gap.sh`).
+
+### D19: Postgres access through runtime-checked sqlx queries (M5)
+- No `query!` macros, so building and CI never need a database or a committed `.sqlx/` cache. The cost is no compile-time SQL checking. `crates/store/tests/postgres.rs` runs every query against a real Postgres instead. CI has a Postgres service and `FAILSCOPE_REQUIRE_DB=1`, so those tests can't skip there.
+- `block_time` is backfilled with `UPDATE … WHERE slot = $1 AND block_time IS NULL` when block meta arrives, because transaction updates don't carry it.
+
 ## Runtime findings (observed, not assumed)
 
 Observed on Agave 3.1.14 (LiteSVM 0.10 and devnet, identical logs):
@@ -83,6 +100,9 @@ Observed on Agave 3.1.14 (LiteSVM 0.10 and devnet, identical logs):
   - 83: encoding (0 none, 1 utf8, 2 base58, 3 base64). 84: compression (0 none, 1 gzip, 2 zlib). 85: format (1 json). 86: data source (0 direct). 87..91: data length u32 LE. 91..96: padding.
   - `anchor idl init` 1.2 wrote utf8 + zlib + json + direct, which decompresses byte-for-byte to `target/idl/fail_target.json`. Canonical address: `find_program_address([program, "idl" padded to 16], PMP)`, which reproduces the `FDDf…` address Anchor CLI used for Jupiter. The gzip and base58/base64 paths are unit-tested only, with no on-chain sample.
 - **Every real IDL seen in the legacy location so far:** Jupiter and Whirlpool are spec format; Marinade, Mango v4, Drift and Kamino are legacy format. The `errors` array has the same shape in both formats.
+- **Yellowstone 12.1 `SubscribeReplayInfo.first_available` is `u64::MAX` until the plugin first prunes**, which happens once finalized > `10 + replay_stored_slots`. Until then every slot since server start *is* replayable. So `u64::MAX` means "nothing pruned yet", not "nothing stored". Reading it as "no replay" caused a bogus gap and skipped a resume that would have worked.
+- **Restarting `solana-test-validator` with its ledger kept loses nothing**: it replays the ledger from the start, and the plugin sees every transaction again. Real loss only happens once the replay window is exceeded.
+- **Yellowstone `TransactionError` is bincode** (`solana-storage.proto`, `bytes err`). It deserializes into the same `solana_transaction_error::TransactionError` the RPC JSON parses into. Checked on all 8 captured cases, where both adapters produce identical decoder input.
 - Anchor 1.2 CPI codegen needs every `#[derive(Accounts)]` struct to take `'info`, so an empty `struct Foo {}` fails to compile under the `cpi` feature.
 
 ## To verify (resolve during the listed milestone)
@@ -92,7 +112,7 @@ Observed on Agave 3.1.14 (LiteSVM 0.10 and devnet, identical logs):
 | Anchor 1.x IDL storage location: Program Metadata Program vs legacy `anchor:idl` account; exact derivation + layout of each | M4 | done: both verified on chain (D15, findings) |
 | IDL format differences: legacy vs 0.30+ spec (`errors` array shape) | M4 | done: same `errors` shape; format told apart by top-level `address` + `metadata.spec` |
 | Anchor framework error code table for anchor-lang 1.2 | M3 | done: generated from anchor-lang-error 1.2.1 (82 codes) |
-| Which `TransactionError` variants can land (fee charged) in current Agave | M5 | partly: all fixtures are `InstructionError`; decoder handles every variant generically. Measure real distribution in M5 |
+| Which `TransactionError` variants can land (fee charged) in current Agave | M7+ | partly: all fixtures are `InstructionError`; decoder handles every variant generically. Measure the real distribution on a mainnet stream |
 | Default CU limit rule (200k per non-builtin ix, 1.4M cap) in current runtime | M3 | done: agave 3.1.14 = 3k per builtin (9 programs) + 200k per other ix, cap 1.4M; priority fee rounds up. Cross-checked against every fixture's fee |
-| Yellowstone proto: `failed` filter field, `from_slot` support + provider retention window | M5 | open |
-| Current compatible versions: yellowstone-grpc-client/proto ↔ solana-* split crates | M0/M5 | open |
+| Yellowstone proto: `failed` filter field, `from_slot` support + provider retention window | M5 | done for the local plugin (D18, findings); a hosted provider's window is configured on its side |
+| Current compatible versions: yellowstone-grpc-client/proto ↔ solana-* split crates | M0/M5 | done: 12.1.0 ↔ Solana 3.x (D17) |
