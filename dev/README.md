@@ -38,6 +38,13 @@ Program Metadata program plus both IDL accounts from devnet, so IDL fetching
 works locally. `dev/yellowstone-config.json` keeps 5000 slots for `from_slot`
 replay.
 
+## Dashboard with data
+
+```sh
+cargo run -p failscope-api -- serve   # http://127.0.0.1:8080
+dev/traffic.sh 10                     # random mix of failure cases for 10 minutes
+```
+
 ## End-to-end checks
 
 - `dev/e2e-resume.sh`: ingest is SIGKILLed and later SIGTERMed while failures

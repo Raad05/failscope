@@ -92,6 +92,13 @@ Record each decision and each resolved "verify" item: what was decided, why, sou
 - Ingest loads it at startup (`IdlCache::seed`, keeping each entry's original age so TTLs still apply) and writes a row whenever `ensure` fetched a new found/missing result. Errors aren't persisted, since they're retried within minutes.
 - The store has its own plain-string row type, so `failscope-store` doesn't depend on `failscope-idl`.
 
+### D22: Dashboard is vanilla JS + inline SVG, served from the binary (M7, 2026-10-09)
+- There's no chart library and no CDN. The few chart forms needed (one line chart with crosshair, bar lists, tables) are about 450 lines of plain JS, and a CDN script would weaken the CSP. HTML, CSS and JS are compiled in with `include_str!`, so there's one binary and nothing to deploy alongside it.
+- Strict CSP (`default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'`), `nosniff`, `no-referrer`. Error names come from on-chain IDLs that anyone can publish, so every API string reaches the DOM through `textContent` only. A test fails if `innerHTML` appears in the script.
+- Chart rules follow the dataviz method: forms picked by job (stat tiles for single numbers, a line for the trend, one-color bars for magnitude), emphasis instead of categorical color (selected program in blue, all failures as gray context), thin marks, hairline grid, a table view for every chart, keyboard-reachable crosshair, and dark mode from the same palette.
+- The palette was validated with the dataviz validator: blue vs gray passes CVD separation (ΔE 15.9), the normal-vision floor and contrast in both modes. Its one FAIL, the chroma floor on gray, is intended: gray is the de-emphasis context, not a category.
+- The README screenshot is from a local validator fed by `dev/traffic.sh`: synthetic failures from the companion program, but each one really went through validator → Yellowstone → decode → Postgres → API.
+
 ## Runtime findings (observed, not assumed)
 
 Observed on Agave 3.1.14 (LiteSVM 0.10 and devnet, identical logs):

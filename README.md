@@ -2,9 +2,11 @@
 
 > Streams Solana transactions that **failed on-chain**, decodes *why* they failed (including custom Anchor errors inside CPIs, attributed to the program that actually failed), stores them, and serves an API and dashboard.
 
-_Screenshot: coming in M7._
+![failscope dashboard](docs/dashboard.png)
 
-**Status:** M6 done (JSON API over the stored failures; IDL cache persisted). See [PLAN.md](PLAN.md) for the roadmap.
+_Dashboard during a local run: synthetic failures from the companion program (`dev/traffic.sh`), streamed through a local validator's Yellowstone plugin, decoded and stored. A real-traffic run comes with a hosted endpoint. [Dark mode](docs/dashboard-dark.png)._
+
+**Status:** M7 done (dashboard). Next: one stretch goal from PLAN M8. See [PLAN.md](PLAN.md) for the roadmap.
 
 ## Failed vs dropped
 
@@ -47,7 +49,7 @@ Yellowstone gRPC ──> ingest ──> decoder ──> store (Postgres) ──>
    6. `unknown`: code and program are kept; the name is not.
 3. **IDLs** come from `crates/idl`, which reads both on-chain locations in one RPC call: the legacy Anchor IDL account (Anchor < 1.0, most mainnet programs) and the Program Metadata account (Anchor ≥ 1.0). Both IDL formats are handled. A TTL cache, which also caches "no IDL", feeds the decoder.
 4. **Ingest** (`crates/ingest`) subscribes to failed, non-vote transactions at `confirmed` commitment, plus block meta for `block_time`. A bounded channel gives backpressure. On reconnect it resumes from a slot cursor via `from_slot`; slots the server can no longer replay are recorded in `ingest_gaps` instead of being silently skipped. Both directions were tested against a local validator: hard kill, graceful stop, and exceeding the replay window (`dev/e2e-*.sh`).
-5. **API** (`failscope serve`): top failing programs, top errors per program, failures over time, decode coverage, and failure lookup. See [docs/api.md](docs/api.md).
+5. **API and dashboard** (`failscope serve`): top failing programs, top errors per program, failures over time, decode coverage, and failure lookup ([docs/api.md](docs/api.md)). The dashboard at `/` is plain HTML/JS/SVG compiled into the binary, served with a strict CSP.
 6. **Derive** `cu_requested` and `priority_fee` from compute-budget instructions using agave 3.1's rules. Tests check that `5000 × signatures + priority_fee` equals the charged fee for every fixture.
 
 ## Companion program failure modes
@@ -82,7 +84,8 @@ cp .env.example .env
 docker compose up -d db          # Postgres
 dev/localnet.sh                  # local validator + Yellowstone gRPC
 cargo run -p failscope-api -- ingest
-cargo run -p failscope-api -- serve   # API on 127.0.0.1:8080
+cargo run -p failscope-api -- serve   # dashboard + API on http://127.0.0.1:8080
+dev/traffic.sh 10                     # optional: 10 min of synthetic failures
 
 # off-chain workspace
 cargo fmt --all --check

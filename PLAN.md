@@ -161,7 +161,7 @@ Instructions that each fail deliberately in a distinct way:
 
 ### M7: Dashboard
 - One good page: top failing programs and error names over the last 24h, a time-series chart, and a program detail view. Keep it plain (static HTML + a chart lib, or htmx).
-- Done when: you can point a screenshot at the README.
+- Done when: you can point a screenshot at the README. (Done: `docs/dashboard.png`, D22.)
 
 ### M8: Stretch (pick one)
 - Bot-likelihood heuristic (e.g. signer failure rate, tx frequency, tip patterns) with a documented, honest methodology.

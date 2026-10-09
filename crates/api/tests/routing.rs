@@ -143,3 +143,39 @@ async fn unknown_signature_is_404() {
     assert_eq!(status, StatusCode::NOT_FOUND);
     assert!(body["error"].as_str().unwrap().contains(sig));
 }
+
+#[tokio::test]
+async fn dashboard_is_served_with_a_strict_policy() {
+    for (uri, content_type) in [
+        ("/", "text/html"),
+        ("/assets/dashboard.css", "text/css"),
+        ("/assets/dashboard.js", "text/javascript"),
+    ] {
+        let response = router(Arc::new(NoQueries { allow: false }))
+            .oneshot(Request::get(uri).body(Body::empty()).unwrap())
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK, "{uri}");
+        let headers = response.headers();
+        assert!(
+            headers["content-type"]
+                .to_str()
+                .unwrap()
+                .starts_with(content_type),
+            "{uri}"
+        );
+        let csp = headers["content-security-policy"].to_str().unwrap();
+        assert!(
+            csp.contains("script-src 'self'") && !csp.contains("unsafe-inline"),
+            "{uri}: {csp}"
+        );
+        assert_eq!(headers["x-content-type-options"], "nosniff");
+    }
+
+    // The page must not rely on inline code the policy would block.
+    let html = include_str!("../assets/index.html");
+    assert!(!html.contains("<script>") && !html.contains(" style=") && !html.contains("onclick"));
+    // Untrusted strings only through textContent.
+    let js = include_str!("../assets/dashboard.js");
+    assert!(!js.contains("innerHTML") && !js.contains("insertAdjacentHTML"));
+}

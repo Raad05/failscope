@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>failscope</title>
+  <link rel="stylesheet" href="/assets/dashboard.css">
+  <script src="/assets/dashboard.js" defer></script>
+</head>
+<body>
+  <header class="top">
+    <div class="brand">
+      <h1>failscope</h1>
+      <p class="sub">Solana transactions that failed on-chain, and why</p>
+    </div>
+    <button type="button" id="theme" class="ghost" aria-label="Toggle dark mode">Dark</button>
+  </header>
+
+  <nav class="filters" aria-label="Time window">
+    <span class="filter-label">Window</span>
+    <div class="segmented" role="radiogroup" aria-label="Time window">
+      <button type="button" role="radio" data-hours="1">1h</button>
+      <button type="button" role="radio" data-hours="6">6h</button>
+      <button type="button" role="radio" data-hours="24">24h</button>
+      <button type="button" role="radio" data-hours="168">7d</button>
+    </div>
+    <span id="status" class="muted" aria-live="polite"></span>
+  </nav>
+
+  <main id="main">
+    <section class="tiles" aria-label="Summary">
+      <div class="tile"><div class="tile-label">Failed transactions</div><div class="tile-value" id="kpi-total">–</div></div>
+      <div class="tile"><div class="tile-label">Programs with failures</div><div class="tile-value" id="kpi-programs">–</div></div>
+      <div class="tile"><div class="tile-label">Decoded to a named error</div><div class="tile-value" id="kpi-decoded">–</div></div>
+    </section>
+
+    <section class="card wide" aria-labelledby="ts-title">
+      <div class="card-head">
+        <div>
+          <h2 id="ts-title">Failures over time</h2>
+          <p class="card-sub" id="ts-sub"></p>
+        </div>
+        <button type="button" class="ghost table-toggle" data-for="ts">Table</button>
+      </div>
+      <div class="legend" id="ts-legend"></div>
+      <div class="chart" id="ts"></div>
+    </section>
+
+    <div class="grid">
+      <section class="card" aria-labelledby="top-title">
+        <div class="card-head">
+          <div>
+            <h2 id="top-title">Top failing programs</h2>
+            <p class="card-sub">The program that actually failed, after CPI attribution. Select one for details.</p>
+          </div>
+          <button type="button" class="ghost table-toggle" data-for="top">Table</button>
+        </div>
+        <div class="chart" id="top"></div>
+      </section>
+
+      <section class="card" aria-labelledby="cov-title">
+        <div class="card-head">
+          <div>
+            <h2 id="cov-title">How errors were decoded</h2>
+            <p class="card-sub">Share of failures by decode source</p>
+          </div>
+          <button type="button" class="ghost table-toggle" data-for="cov">Table</button>
+        </div>
+        <div class="chart" id="cov"></div>
+      </section>
+    </div>
+
+    <section class="card wide" aria-labelledby="detail-title">
+      <div class="card-head">
+        <div>
+          <h2 id="detail-title">Program</h2>
+          <p class="card-sub mono" id="detail-sub"></p>
+        </div>
+      </div>
+      <div class="grid">
+        <div>
+          <h3>Top errors</h3>
+          <div id="errors"></div>
+        </div>
+        <div>
+          <h3>Recent failures</h3>
+          <div id="recent"></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div id="tooltip" class="tooltip" role="status" hidden></div>
+</body>
+</html>

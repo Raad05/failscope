@@ -21,6 +21,9 @@ const MAX_OFFSET: u32 = 1_000_000;
 
 pub fn router<Q: Queries + 'static>(queries: Arc<Q>) -> Router {
     Router::new()
+        .route("/", get(dashboard_html))
+        .route("/assets/dashboard.css", get(dashboard_css))
+        .route("/assets/dashboard.js", get(dashboard_js))
         .route("/health", get(health))
         .route("/api/programs/top", get(top_programs::<Q>))
         .route(
@@ -150,6 +153,46 @@ fn check_base58(what: &str, s: &str, len: std::ops::RangeInclusive<usize>) -> Re
 
 fn check_program(s: &str) -> Result<(), ApiError> {
     check_base58("program id", s, 32..=44)
+}
+
+// ---------------------------------------------------------------- dashboard
+
+// Embedded at compile time: one binary, no static directory to deploy.
+const INDEX_HTML: &str = include_str!("../assets/index.html");
+const DASHBOARD_CSS: &str = include_str!("../assets/dashboard.css");
+const DASHBOARD_JS: &str = include_str!("../assets/dashboard.js");
+
+/// Same-origin only, no inline script or style: the page renders error
+/// names from on-chain IDLs, which anyone can publish.
+pub const CONTENT_SECURITY_POLICY: &str = "default-src 'none'; script-src 'self'; \
+    style-src 'self'; connect-src 'self'; img-src 'self'; base-uri 'none'; \
+    form-action 'none'; frame-ancestors 'none'";
+
+fn asset(content_type: &'static str, body: &'static str) -> Response {
+    use axum::http::header;
+    (
+        [
+            (header::CONTENT_TYPE, content_type),
+            (header::CONTENT_SECURITY_POLICY, CONTENT_SECURITY_POLICY),
+            (header::X_CONTENT_TYPE_OPTIONS, "nosniff"),
+            (header::REFERRER_POLICY, "no-referrer"),
+            (header::CACHE_CONTROL, "no-cache"),
+        ],
+        body,
+    )
+        .into_response()
+}
+
+async fn dashboard_html() -> Response {
+    asset("text/html; charset=utf-8", INDEX_HTML)
+}
+
+async fn dashboard_css() -> Response {
+    asset("text/css; charset=utf-8", DASHBOARD_CSS)
+}
+
+async fn dashboard_js() -> Response {
+    asset("text/javascript; charset=utf-8", DASHBOARD_JS)
 }
 
 // ---------------------------------------------------------------- handlers
