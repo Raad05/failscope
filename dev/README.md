@@ -54,4 +54,6 @@ dev/traffic.sh 10                     # random mix of failure cases for 10 minut
   (`dev/yellowstone-config-short-replay.json`). Ingest stays down past it, and
   every failure sent meanwhile must fall inside a recorded gap.
 
-Both use throwaway databases (`failscope_e2e`, `failscope_e2e_gap`).
+- `dev/e2e-alert.sh`: alerting on a live stream with short windows (1 min window, 6 min baseline, 10s ticks). A quiet baseline must not alert, a burst must fire once, and quiet again must resolve. Webhooks go to `dev/webhook_sink.py`. Takes about 10 minutes.
+
+All use throwaway databases (`failscope_e2e`, `failscope_e2e_gap`, `failscope_e2e_alert`).

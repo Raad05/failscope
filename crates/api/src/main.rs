@@ -34,6 +34,34 @@ enum Command {
         #[arg(long, env = "INGEST_STREAM", default_value = "default")]
         stream: String,
     },
+    /// Watch per-program failure rates and POST a webhook when one spikes.
+    Alert {
+        #[arg(long, env = "DATABASE_URL", hide_env_values = true)]
+        database_url: String,
+        /// Receives JSON alerts (Slack-compatible `text` field included). Secret.
+        #[arg(long, env = "ALERT_WEBHOOK_URL", hide_env_values = true)]
+        webhook_url: String,
+        /// Minutes counted as "now".
+        #[arg(long, env = "ALERT_WINDOW_MINUTES", default_value_t = 5)]
+        window_minutes: u32,
+        /// Minutes before the window used as the program's normal rate.
+        #[arg(long, env = "ALERT_BASELINE_MINUTES", default_value_t = 60)]
+        baseline_minutes: u32,
+        /// Fire when the window count reaches this multiple of the baseline.
+        #[arg(long, env = "ALERT_FACTOR", default_value_t = 3.0)]
+        factor: f64,
+        /// Never fire below this many failures in the window.
+        #[arg(long, env = "ALERT_MIN_FAILURES", default_value_t = 10)]
+        min_failures: u64,
+        #[arg(long, env = "ALERT_INTERVAL_SECS", default_value_t = 60)]
+        interval_secs: u64,
+        /// Programs to watch (repeat or comma-separate); default all.
+        #[arg(long = "program", env = "ALERT_PROGRAMS", value_delimiter = ',')]
+        programs: Vec<String>,
+        /// Dashboard base URL, linked from alerts.
+        #[arg(long, env = "DASHBOARD_URL")]
+        dashboard_url: Option<String>,
+    },
     /// Serve the JSON API.
     Serve {
         #[arg(long, env = "DATABASE_URL", hide_env_values = true)]
@@ -76,6 +104,42 @@ async fn main() -> anyhow::Result<()> {
                 failscope_ingest::run(config, Arc::new(store), Arc::new(idls), shutdown_signal())
                     .await?;
             tracing::info!(?stats, "ingest stopped");
+        }
+        Command::Alert {
+            database_url,
+            webhook_url,
+            window_minutes,
+            baseline_minutes,
+            factor,
+            min_failures,
+            interval_secs,
+            programs,
+            dashboard_url,
+        } => {
+            anyhow::ensure!(window_minutes >= 1, "--window-minutes must be at least 1");
+            anyhow::ensure!(
+                baseline_minutes >= window_minutes,
+                "--baseline-minutes must be at least --window-minutes"
+            );
+            anyhow::ensure!(factor >= 1.0, "--factor must be at least 1");
+            anyhow::ensure!(interval_secs >= 5, "--interval-secs must be at least 5");
+            let store = PgStore::connect(&database_url)
+                .await
+                .context("connecting to Postgres")?;
+            let config = failscope_alert::AlertConfig {
+                rule: failscope_alert::Rule {
+                    window_minutes,
+                    baseline_minutes,
+                    factor,
+                    min_failures,
+                    ..Default::default()
+                },
+                webhook_url,
+                interval: std::time::Duration::from_secs(interval_secs),
+                programs: programs.into_iter().filter(|p| !p.is_empty()).collect(),
+                dashboard_url,
+            };
+            failscope_alert::run(config, Arc::new(store), shutdown_signal()).await?;
         }
         Command::Serve { database_url, bind } => {
             let store = PgStore::connect(&database_url)

@@ -9,10 +9,11 @@ use axum::body::Body;
 use axum::http::{Request, StatusCode};
 use failscope_api::http::router;
 use failscope_store::{
-    Bucket, CoveragePart, ErrorCount, FailureFilter, FailureRow, Page, Queries, Result, TimeBucket,
-    TopProgram,
+    AlertEvent, AlertState, AlertStore, Bucket, CoveragePart, ErrorCount, FailureFilter,
+    FailureRow, NewAlertEvent, Page, Queries, Result, TimeBucket, TopProgram,
 };
 use http_body_util::BodyExt;
+use std::collections::HashMap;
 use tower::ServiceExt;
 
 /// Panics if a query runs: every request in these tests must be answered
@@ -71,6 +72,25 @@ impl Queries for NoQueries {
     }
 }
 
+impl AlertStore for NoQueries {
+    async fn failures_per_minute(&self, _: u32, _: &[String]) -> Result<HashMap<String, Vec<u64>>> {
+        unreachable!("the API never evaluates alerts")
+    }
+    async fn alert_states(&self) -> Result<HashMap<String, AlertState>> {
+        unreachable!("the API never evaluates alerts")
+    }
+    async fn record_alert(&self, _: &NewAlertEvent) -> Result<()> {
+        unreachable!("the API never records alerts")
+    }
+    async fn alert_events(&self, _: u32, _: u32) -> Result<Vec<AlertEvent>> {
+        assert!(
+            self.allow,
+            "query ran for a request that should have been rejected"
+        );
+        Ok(vec![])
+    }
+}
+
 async fn get(allow: bool, uri: &str) -> (StatusCode, serde_json::Value) {
     let response = router(Arc::new(NoQueries { allow }))
         .oneshot(Request::get(uri).body(Body::empty()).unwrap())
@@ -100,6 +120,8 @@ async fn rejects_bad_parameters_before_querying() {
         "/api/programs/top?limit=abc",
         "/api/failures/tooshort",
         "/api/coverage?hours=9999",
+        "/api/alerts?hours=0",
+        "/api/alerts?offset=5",
     ] {
         let (status, body) = get(false, uri).await;
         assert_eq!(status, StatusCode::BAD_REQUEST, "{uri}: {body}");
@@ -123,6 +145,7 @@ async fn defaults_and_envelope() {
         "/api/failures?hours=48&limit=5&offset=5",
         "/api/failures/timeseries?hours=48&bucket=day",
         "/api/coverage?hours=48",
+        "/api/alerts?hours=48&limit=5",
     ] {
         let (status, body) = get(true, uri).await;
         assert_eq!(status, StatusCode::OK, "{uri}: {body}");

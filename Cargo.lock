@@ -535,6 +535,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "failscope-alert"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "failscope-decoder",
+ "failscope-store",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "sqlx",
+ "thiserror",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "failscope-api"
 version = "0.1.0"
 dependencies = [
@@ -542,6 +558,7 @@ dependencies = [
  "axum",
  "clap",
  "dotenvy",
+ "failscope-alert",
  "failscope-decoder",
  "failscope-idl",
  "failscope-ingest",

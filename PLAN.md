@@ -164,8 +164,8 @@ Instructions that each fail deliberately in a distinct way:
 - Done when: you can point a screenshot at the README. (Done: `docs/dashboard.png`, D22.)
 
 ### M8: Stretch (pick one)
-- Bot-likelihood heuristic (e.g. signer failure rate, tx frequency, tip patterns) with a documented, honest methodology.
-- Alerting (webhook) on error spikes for a chosen program.
+- ~~Bot-likelihood heuristic (e.g. signer failure rate, tx frequency, tip patterns) with a documented, honest methodology.~~ Dropped (D24): only meaningful on real mainnet traffic.
+- Alerting (webhook) on error spikes for a chosen program. **(Chosen and done: `failscope alert`, D23.)**
 - ClickHouse backend behind the store trait.
 
 ## 6. Suggested crates (verify current versions)
@@ -188,7 +188,7 @@ tokio, tonic (via yellowstone), `yellowstone-grpc-client` and `yellowstone-grpc-
 ## 8. Cost and environment notes
 
 - Yellowstone access usually comes from a paid RPC provider (entry plans exist, but pricing changes, so check current plans) or a self-run node. For development, prefer **devnet** plus recorded fixtures so most of the work needs no streaming plan.
-- Only buy mainnet streaming access when you reach M5 and want real data.
+- ~~Only buy mainnet streaming access when you reach M5 and want real data.~~ Scope decision (2026-10-10, D24): devnet and local validator only; no mainnet streaming.
 
 ## 9. README requirements (this is what hiring managers will read)
 

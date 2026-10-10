@@ -10,7 +10,7 @@ use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use axum::routing::get;
 use axum::{Json, Router};
-use failscope_store::{FailureFilter, Page, Queries, TimeBucket, MAX_LIMIT};
+use failscope_store::{AlertStore, FailureFilter, Page, Queries, TimeBucket, MAX_LIMIT};
 use serde::{Deserialize, Serialize};
 use tower_http::trace::TraceLayer;
 
@@ -19,7 +19,7 @@ pub const MAX_HOURS: u32 = 720;
 pub const DEFAULT_LIMIT: u32 = 50;
 const MAX_OFFSET: u32 = 1_000_000;
 
-pub fn router<Q: Queries + 'static>(queries: Arc<Q>) -> Router {
+pub fn router<Q: Queries + AlertStore + 'static>(queries: Arc<Q>) -> Router {
     Router::new()
         .route("/", get(dashboard_html))
         .route("/assets/dashboard.css", get(dashboard_css))
@@ -34,6 +34,7 @@ pub fn router<Q: Queries + 'static>(queries: Arc<Q>) -> Router {
         .route("/api/failures/timeseries", get(timeseries::<Q>))
         .route("/api/failures/{signature}", get(failure::<Q>))
         .route("/api/coverage", get(coverage::<Q>))
+        .route("/api/alerts", get(alerts::<Q>))
         .layer(TraceLayer::new_for_http())
         .with_state(queries)
 }
@@ -346,6 +347,23 @@ async fn coverage<Q: Queries>(
     Ok(Json(Coverage {
         total: data.iter().map(|c| c.failures).sum(),
         data,
+        window_hours: hours,
+    }))
+}
+
+async fn alerts<Q: AlertStore>(
+    State(q): State<Arc<Q>>,
+    ApiQuery(p): ApiQuery<WindowParams>,
+) -> ApiResult<Listing<failscope_store::AlertEvent>> {
+    let (hours, page) = (p.hours()?, p.page()?);
+    if page.offset != 0 {
+        return Err(ApiError::BadRequest(
+            "alerts don't support offset".to_string(),
+        ));
+    }
+    Ok(Json(Listing {
+        data: q.alert_events(hours, page.limit).await?,
+        page,
         window_hours: hours,
     }))
 }

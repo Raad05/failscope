@@ -99,6 +99,18 @@ Record each decision and each resolved "verify" item: what was decided, why, sou
 - The palette was validated with the dataviz validator: blue vs gray passes CVD separation (ΔE 15.9), the normal-vision floor and contrast in both modes. Its one FAIL, the chroma floor on gray, is intended: gray is the de-emphasis context, not a category.
 - The README screenshot is from a local validator fed by `dev/traffic.sh`: synthetic failures from the companion program, but each one really went through validator → Yellowstone → decode → Postgres → API.
 
+### D23: Alerting compares each program with its own baseline (M8, 2026-10-10)
+- Fires when failures in the last `window` minutes reach `max(min_failures, factor × max(baseline_per_window, 1))`, where the baseline is the program's average per window over the preceding `baseline` minutes (defaults 5 / 60 / ×3 / 10). A busy program's normal rate stays quiet, and a quiet program's burst fires. Resolves below `0.75 × threshold` (hysteresis).
+- **Why not a global threshold:** failure rates differ by orders of magnitude between programs; one number would either page constantly for Jupiter or never for a small program. **Why not z-scores:** per-minute failure counts are sparse and bursty, and a mean plus a ratio and a floor is easier to reason about and to explain in an alert.
+- The webhook fires only on state changes. A change is written to `alert_events` only after the webhook returned 2xx (3 attempts), so a delivery failure is retried next tick rather than lost. The payload is JSON with a Slack-compatible `text`.
+- The webhook URL is treated as a secret: from env, hidden in `--help`, and stripped from reqwest errors before logging.
+- Detection is a pure function (`crates/alert/src/rule.rs`), unit-tested. The loop is tested against real Postgres with a fake receiver (fire, no duplicate, retry after a failed delivery, resolve, program filter), and end to end on a live local stream (`dev/e2e-alert.sh`).
+
+### D24: Scope is devnet and a local validator; no mainnet (2026-10-10)
+- Decided by the project owner. Nothing streams from or sends to mainnet. `send_failures` already refuses mainnet URLs.
+- The mainnet transactions and IDL accounts already in `fixtures/` stay. They are static, read-only test data (recorded once via public RPC) that cover real-world shapes the companion program can't produce (Jupiter's IDL-only slippage error, a silent inner program, legacy IDL locations).
+- Dropped: the bot-likelihood heuristic (needs real mainnet traffic) and mainnet coverage numbers. Coverage is reported on fixtures and on local runs instead. A hosted **devnet** Yellowstone endpoint remains possible later; it only changes `YELLOWSTONE_ENDPOINT`.
+
 ## Runtime findings (observed, not assumed)
 
 Observed on Agave 3.1.14 (LiteSVM 0.10 and devnet, identical logs):

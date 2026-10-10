@@ -8,7 +8,10 @@ use std::future::Future;
 use failscope_decoder::DecodedFailure;
 use sqlx::postgres::{PgPool, PgPoolOptions};
 
+mod alerts;
 mod queries;
+
+pub use alerts::{AlertEvent, AlertState, AlertStore, NewAlertEvent};
 
 pub use queries::{
     Bucket, CoveragePart, ErrorCount, FailureFilter, FailureRow, Page, Queries, TimeBucket,
