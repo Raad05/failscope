@@ -1,0 +1,20 @@
+{
+  "signature": "2uZXqAYqM3uiF3utaNg2ZZqQNQammruWGbC9if63UtLBCKjgcS2c9KqFzMyjEdUyQWouNN25vS5DFC4zRDotbLzz",
+  "cluster": "devnet",
+  "description": "ATA create (succeeds, Token invoked 3 times), then fail_target CPIs a Token transfer from the empty account; Token fails",
+  "top_level_ix_index": 1,
+  "root_program_id": "6MzbWCZgmdSrBwcUVypa4aGNKdck6r49jV7Y48AhPNey",
+  "failing_program_id": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+  "cpi_depth": 2,
+  "error_kind": "custom",
+  "error_code": 1,
+  "error_name": "InsufficientFunds",
+  "error_message": null,
+  "decode_source": "native",
+  "attribution_confidence": "high",
+  "signer": "Dx7RPXNY6qwLY7352Wh5NyatNTSwssmcFiN4Bphs14g2",
+  "uses_alt": false,
+  "log_truncated": false,
+  "cu_consumed": 16126,
+  "fee": 5000
+}

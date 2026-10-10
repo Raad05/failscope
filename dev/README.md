@@ -45,6 +45,20 @@ cargo run -p failscope-api -- serve   # http://127.0.0.1:8080
 dev/traffic.sh 10                     # random mix of failure cases for 10 minutes
 ```
 
+## In Docker
+
+```sh
+dev/localnet.sh                                   # still on the host
+docker compose --profile app up -d --build        # db + ingest + serve
+docker compose logs -f ingest
+docker compose --profile app down                 # stop (keeps the pgdata volume)
+```
+
+`ingest` runs with host networking, because the plugin's gRPC port only
+listens on 127.0.0.1 (see D26 in `docs/decisions.md`). For a hosted devnet
+endpoint set `COMPOSE_YELLOWSTONE_ENDPOINT`, `COMPOSE_RPC_URL` and
+`YELLOWSTONE_X_TOKEN` in `.env`.
+
 ## End-to-end checks
 
 - `dev/e2e-resume.sh`: ingest is SIGKILLed and later SIGTERMed while failures

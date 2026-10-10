@@ -10,17 +10,44 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use failscope_decoder::{Confidence, DecodeSource, DecodedFailure};
 use failscope_store::{PgStore, Store};
 
-async fn store() -> Option<PgStore> {
-    match std::env::var("DATABASE_URL") {
-        Ok(url) => Some(PgStore::connect(&url).await.unwrap()),
+/// A throwaway database per test, so test rows never reach the dev database
+/// the dashboard reads.
+struct TestDb {
+    store: PgStore,
+    admin: PgStore,
+    name: String,
+}
+
+impl TestDb {
+    async fn drop_db(self) {
+        self.store.pool().close().await;
+        sqlx::query(&format!("DROP DATABASE {} WITH (FORCE)", self.name))
+            .execute(self.admin.pool())
+            .await
+            .unwrap();
+    }
+}
+
+async fn test_db() -> Option<TestDb> {
+    let url = match std::env::var("DATABASE_URL") {
+        Ok(url) => url,
         Err(_) if std::env::var("FAILSCOPE_REQUIRE_DB").as_deref() == Ok("1") => {
             panic!("FAILSCOPE_REQUIRE_DB=1 but DATABASE_URL is not set")
         }
         Err(_) => {
             eprintln!("DATABASE_URL not set; skipping Postgres tests");
-            None
+            return None;
         }
-    }
+    };
+    let admin = PgStore::connect(&url).await.unwrap();
+    let name = unique("failscope_store_test").replace('-', "_");
+    sqlx::query(&format!("CREATE DATABASE {name}"))
+        .execute(admin.pool())
+        .await
+        .unwrap();
+    let (base, _) = url.rsplit_once('/').unwrap();
+    let store = PgStore::connect(&format!("{base}/{name}")).await.unwrap();
+    Some(TestDb { store, admin, name })
 }
 
 /// Unique per test run so tests don't see each other's rows.
@@ -61,7 +88,8 @@ fn failure(signature: &str, slot: u64) -> DecodedFailure {
 
 #[tokio::test]
 async fn insert_is_idempotent_and_round_trips() {
-    let Some(store) = store().await else { return };
+    let Some(db) = test_db().await else { return };
+    let store = &db.store;
     let sig = unique("sig");
     let slot = 4_000_000_000;
     assert!(store.insert_failure(&failure(&sig, slot)).await.unwrap());
@@ -84,11 +112,13 @@ async fn insert_is_idempotent_and_round_trips() {
         ("anchor_log", "high", Some(6000))
     );
     assert_eq!(raw["InstructionError"][1]["Custom"], 6000);
+    db.drop_db().await;
 }
 
 #[tokio::test]
 async fn block_time_is_filled_once() {
-    let Some(store) = store().await else { return };
+    let Some(db) = test_db().await else { return };
+    let store = &db.store;
     let slot = 4_100_000_000
         + (SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -109,11 +139,13 @@ async fn block_time_is_filled_once() {
         0,
         "overwrote a block time"
     );
+    db.drop_db().await;
 }
 
 #[tokio::test]
 async fn cursor_never_moves_backwards() {
-    let Some(store) = store().await else { return };
+    let Some(db) = test_db().await else { return };
+    let store = &db.store;
     let stream = unique("stream");
     assert_eq!(store.cursor(&stream).await.unwrap(), None);
     store.save_cursor(&stream, 100).await.unwrap();
@@ -121,11 +153,13 @@ async fn cursor_never_moves_backwards() {
     assert_eq!(store.cursor(&stream).await.unwrap(), Some(100));
     store.save_cursor(&stream, 120).await.unwrap();
     assert_eq!(store.cursor(&stream).await.unwrap(), Some(120));
+    db.drop_db().await;
 }
 
 #[tokio::test]
 async fn gaps_are_recorded() {
-    let Some(store) = store().await else { return };
+    let Some(db) = test_db().await else { return };
+    let store = &db.store;
     let stream = unique("gap");
     store.record_gap(&stream, 10, 20, "test").await.unwrap();
     let n: i64 = sqlx::query_scalar("SELECT count(*) FROM ingest_gaps WHERE stream = $1")
@@ -134,12 +168,14 @@ async fn gaps_are_recorded() {
         .await
         .unwrap();
     assert_eq!(n, 1);
+    db.drop_db().await;
 }
 
 #[tokio::test]
 async fn idl_cache_round_trips_and_keeps_age() {
     use failscope_store::IdlCacheRow;
-    let Some(store) = store().await else { return };
+    let Some(db) = test_db().await else { return };
+    let store = &db.store;
     let found = IdlCacheRow {
         program_id: unique("prog"),
         fetch_status: "found".to_string(),
@@ -181,4 +217,5 @@ async fn idl_cache_round_trips_and_keeps_age() {
         .unwrap();
     assert_eq!(got_missing.fetch_status, "missing");
     assert_eq!(got_missing.idl_json, None);
+    db.drop_db().await;
 }

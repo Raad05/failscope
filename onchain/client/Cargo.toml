@@ -32,6 +32,7 @@ solana-transaction-error = "3.0.0"
 
 [dev-dependencies]
 litesvm = "0.10.0"
+solana-account = "3"
 solana-instruction-error = "2.0.0"
 
 [lints.clippy]

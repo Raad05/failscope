@@ -1438,6 +1438,7 @@ dependencies = [
  "litesvm",
  "serde",
  "serde_json",
+ "solana-account",
  "solana-commitment-config",
  "solana-compute-budget-interface",
  "solana-instruction-error",

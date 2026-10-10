@@ -1,4 +1,4 @@
-//! The API against a real Postgres, seeded with the 12 decoded fixtures.
+//! The API against a real Postgres, seeded with the 13 decoded fixtures.
 //!
 //! Needs `DATABASE_URL` (any database on the server; a fresh database is
 //! created per run). Skips without it unless `FAILSCOPE_REQUIRE_DB=1`.
@@ -145,7 +145,7 @@ async fn endpoints_against_seeded_database() {
         .collect();
     assert_eq!(&programs[..2], &[FAIL_TARGET, JUPITER]);
     assert_eq!(column(&top, "failures")[..2], [6, 3].map(Value::from));
-    assert_eq!(programs.len(), 5);
+    assert_eq!(programs.len(), 6);
     let week = get(&store, "/api/programs/top?hours=168").await;
     assert_eq!(
         week["data"][0]["failures"], 7,
@@ -182,7 +182,7 @@ async fn endpoints_against_seeded_database() {
 
     // Coverage matches the fixture decode table.
     let coverage = get(&store, "/api/coverage").await;
-    assert_eq!(coverage["total"], 12);
+    assert_eq!(coverage["total"], 13);
     let by_source: std::collections::HashMap<String, i64> = coverage["data"]
         .as_array()
         .unwrap()
@@ -198,7 +198,7 @@ async fn endpoints_against_seeded_database() {
     assert_eq!(by_source["runtime"], 4);
     assert_eq!(
         (by_source["idl"], by_source["native"], by_source["unknown"]),
-        (1, 1, 1)
+        (1, 2, 1)
     );
 
     // Time series: every failure lands in some bucket, empty buckets are zero.
@@ -209,7 +209,7 @@ async fn endpoints_against_seeded_database() {
         .iter()
         .map(|b| b["failures"].as_i64().unwrap())
         .collect();
-    assert_eq!(counts.iter().sum::<i64>(), 12);
+    assert_eq!(counts.iter().sum::<i64>(), 13);
     assert!(counts.len() >= 120 && counts.contains(&0));
     let jup_ts = get(
         &store,

@@ -111,6 +111,19 @@ Record each decision and each resolved "verify" item: what was decided, why, sou
 - The mainnet transactions and IDL accounts already in `fixtures/` stay. They are static, read-only test data (recorded once via public RPC) that cover real-world shapes the companion program can't produce (Jupiter's IDL-only slippage error, a silent inner program, legacy IDL locations).
 - Dropped: the bot-likelihood heuristic (needs real mainnet traffic) and mainnet coverage numbers. Coverage is reported on fixtures and on local runs instead. A hosted **devnet** Yellowstone endpoint remains possible later; it only changes `YELLOWSTONE_ENDPOINT`.
 
+### D25: SPL Token failure case uses wrapped SOL, created in the same transaction (2026-10-10)
+- `cpi_token_transfer` sends `CreateIdempotent` for the payer's wrapped-SOL associated account, then `fail_target::fail_cpi_token`, which CPIs a Token `Transfer` of 1 from that empty account. Token fails with `InsufficientFunds` (custom 1).
+- Why wrapped SOL: the native mint exists on devnet, on `solana-test-validator`, and (inserted by the test) in LiteSVM, so the case needs no mint, no stored addresses and no setup step. The failure rolls the account creation back, so each send costs only the fee.
+- The Token CPI is hand-built (instruction 3 + amount) instead of adding `anchor-spl`, to keep the program's dependencies to `anchor-lang`.
+- What it tests: code 1 again, from a different program than the System case; the transaction error points at instruction 1; and three *successful* Token frames at the same depth precede the failing one.
+- Deploying the larger program needed `solana program extend … 10240` first: `solana program deploy`'s auto-extend asked for less than the loader's 10 KiB minimum and failed.
+
+### D26: Docker packaging; ingest on host networking (2026-10-10)
+- One image (`Dockerfile`, multi-stage, non-root) with the `failscope` binary. `docker-compose.yml` keeps `db` as the only default service; `ingest` + `serve` are in profile `app`, `alert` in profile `alert` (it needs a webhook URL).
+- `ingest` uses `network_mode: host`. The local validator's Yellowstone plugin listens on `127.0.0.1:10000`, which a bridged container can't reach on Docker Engine (checked: `host.docker.internal` via `host-gateway` reached the RPC port, which binds all interfaces, but not gRPC). Making the plugin listen on all interfaces would expose an unauthenticated gRPC stream to the LAN. With host networking, ingest reaches Postgres on the published `127.0.0.1:5432`.
+- Endpoints are overridden with `COMPOSE_YELLOWSTONE_ENDPOINT` / `COMPOSE_RPC_URL`, separate from `.env`'s `YELLOWSTONE_ENDPOINT`/`RPC_URL`, so the same `.env` works for `cargo run` and for compose.
+- Migrations run on every process start (`PgStore::connect`); sqlx serializes concurrent runs with an advisory lock.
+
 ## Runtime findings (observed, not assumed)
 
 Observed on Agave 3.1.14 (LiteSVM 0.10 and devnet, identical logs):

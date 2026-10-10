@@ -23,6 +23,9 @@ fn so_path(name: &str) -> PathBuf {
 
 fn setup() -> (LiteSVM, Keypair) {
     let mut svm = LiteSVM::new();
+    // LiteSVM ships the SPL programs but not the wrapped-SOL mint account.
+    svm.set_account(fail_client::NATIVE_MINT, native_mint_account())
+        .unwrap();
     for (id, name) in [
         (fail_target::ID, "fail_target"),
         (fail_callee::ID, "fail_callee"),
@@ -44,6 +47,21 @@ fn setup() -> (LiteSVM, Keypair) {
     );
     svm.send_transaction(tx).unwrap();
     (svm, payer)
+}
+
+/// SPL Token `Mint` layout (82 bytes): no mint authority, supply 0,
+/// 9 decimals, initialized, no freeze authority.
+fn native_mint_account() -> solana_account::Account {
+    let mut data = vec![0u8; 82];
+    data[44] = 9;
+    data[45] = 1;
+    solana_account::Account {
+        lamports: 1_000_000_000,
+        data,
+        owner: fail_client::TOKEN_PROGRAM_ID,
+        executable: false,
+        rent_epoch: 0,
+    }
 }
 
 fn run(case: Case) -> FailedTransactionMetadata {
@@ -89,6 +107,7 @@ fn ix_err(index: u8, err: InstructionError) -> TransactionError {
 const TARGET: &str = "6MzbWCZgmdSrBwcUVypa4aGNKdck6r49jV7Y48AhPNey";
 const CALLEE: &str = "BCUANLyTtzvYGheyo7ymmHhDDZQ74WGjwsC8Rv3VFDPb";
 const SYSTEM: &str = "11111111111111111111111111111111";
+const TOKEN: &str = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
 
 #[test]
 fn custom_error() {
@@ -162,4 +181,18 @@ fn nested_cpi_callee() {
     assert_eq!(f.err, ix_err(0, InstructionError::Custom(6000)));
     assert_failed_line(&f, CALLEE, "custom program error: 0x1770");
     assert!(f.meta.logs.iter().any(|l| l.contains("CalleeAlwaysFails")));
+}
+
+#[test]
+fn cpi_token_transfer() {
+    let f = run(Case::CpiToken);
+    // Index 1: the account-creation instruction comes first and succeeds.
+    // Code 1 again, but from Token, where it means InsufficientFunds.
+    assert_eq!(f.err, ix_err(1, InstructionError::Custom(1)));
+    assert_failed_line(&f, TOKEN, "custom program error: 0x1");
+    assert!(f
+        .meta
+        .logs
+        .iter()
+        .any(|l| l.contains("Error: insufficient funds")));
 }

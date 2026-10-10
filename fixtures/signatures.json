@@ -46,5 +46,11 @@
     "signature": "23BA6WjR3b2eaFqgY7g7mnRma3Tbd6q8LYzYeJaVt9Duiq6167DHaZsPK7WkCWEYQLmSvjoStKgaxTabDLGAwh6i",
     "cluster": "https://api.devnet.solana.com",
     "err": "InstructionError(0, Custom(6000))"
+  },
+  {
+    "case": "cpi_token_transfer",
+    "signature": "2uZXqAYqM3uiF3utaNg2ZZqQNQammruWGbC9if63UtLBCKjgcS2c9KqFzMyjEdUyQWouNN25vS5DFC4zRDotbLzz",
+    "cluster": "https://api.devnet.solana.com",
+    "err": "InstructionError(1, Custom(1))"
   }
 ]

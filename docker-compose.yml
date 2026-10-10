@@ -1,3 +1,22 @@
+# Postgres only:            docker compose up -d db
+# Postgres, ingest, serve:  docker compose --profile app up -d --build
+# Plus alerts:              docker compose --profile app --profile alert up -d --build
+#
+# ingest uses host networking: the local validator (dev/localnet.sh) binds its
+# gRPC port to 127.0.0.1 only, which a bridged container cannot reach. It
+# therefore talks to Postgres through the published 127.0.0.1:5432. Override
+# the endpoints with the COMPOSE_* variables (in .env or the shell), e.g. for
+# a hosted devnet endpoint. Secrets (YELLOWSTONE_X_TOKEN, ALERT_WEBHOOK_URL)
+# come from .env.
+
+x-app: &app
+  build: .
+  image: failscope:local
+  restart: unless-stopped
+  depends_on:
+    db:
+      condition: service_healthy
+
 services:
   db:
     image: postgres:16
@@ -14,6 +33,48 @@ services:
       interval: 2s
       timeout: 3s
       retries: 20
+
+  ingest:
+    <<: *app
+    profiles: [app]
+    command: ingest
+    network_mode: host
+    environment:
+      RUST_LOG: ${RUST_LOG:-info}
+      DATABASE_URL: postgres://failscope:failscope@127.0.0.1:5432/failscope
+      YELLOWSTONE_ENDPOINT: ${COMPOSE_YELLOWSTONE_ENDPOINT:-http://127.0.0.1:10000}
+      YELLOWSTONE_X_TOKEN: ${YELLOWSTONE_X_TOKEN:-}
+      RPC_URL: ${COMPOSE_RPC_URL:-http://127.0.0.1:8899}
+      INGEST_STREAM: ${INGEST_STREAM:-default}
+
+  serve:
+    <<: *app
+    profiles: [app]
+    command: serve
+    environment:
+      RUST_LOG: ${RUST_LOG:-info}
+      DATABASE_URL: postgres://failscope:failscope@db:5432/failscope
+      BIND: 0.0.0.0:8080
+    ports:
+      - "127.0.0.1:8080:8080"
+
+  alert:
+    <<: *app
+    profiles: [alert]
+    command: alert
+    # Lets a webhook receiver on the host be reached as host.docker.internal.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      RUST_LOG: ${RUST_LOG:-info}
+      DATABASE_URL: postgres://failscope:failscope@db:5432/failscope
+      ALERT_WEBHOOK_URL: ${ALERT_WEBHOOK_URL:-}
+      ALERT_WINDOW_MINUTES: ${ALERT_WINDOW_MINUTES:-5}
+      ALERT_BASELINE_MINUTES: ${ALERT_BASELINE_MINUTES:-60}
+      ALERT_FACTOR: ${ALERT_FACTOR:-3}
+      ALERT_MIN_FAILURES: ${ALERT_MIN_FAILURES:-10}
+      ALERT_PROGRAMS: ${ALERT_PROGRAMS:-}
+      DASHBOARD_URL: ${DASHBOARD_URL:-http://127.0.0.1:8080}
 
 volumes:
   pgdata:

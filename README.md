@@ -6,7 +6,7 @@
 
 _Dashboard during a local run: synthetic failures from the companion program (`dev/traffic.sh`), streamed through a local validator's Yellowstone plugin, decoded and stored. [Dark mode](docs/dashboard-dark.png)._
 
-**Status:** M0–M8 done (M8: webhook alerting). **Scope: devnet and a local validator only;** nothing streams from mainnet. The few mainnet transactions in `fixtures/` are static, read-only test data. See [PLAN.md](PLAN.md) for the roadmap and [docs/decisions.md](docs/decisions.md) for every design decision and verified runtime behaviour.
+**Status:** M0–M8 done (M8: webhook alerting), plus Docker packaging. **Scope: devnet and a local validator only;** nothing streams from mainnet. The few mainnet transactions in `fixtures/` are static, read-only test data. See [PLAN.md](PLAN.md) for the roadmap and [docs/decisions.md](docs/decisions.md) for every design decision and verified runtime behaviour.
 
 ## Failed vs dropped
 
@@ -81,12 +81,13 @@ Subscribes to failed, non-vote transactions at `confirmed` commitment, plus bloc
 | 5 | compute exhaustion | `InstructionError(1, ProgramFailedToComplete)` | fail_target | ComputeUnitsExceeded (`runtime`) |
 | 6 | CPI to System with bad transfer | `InstructionError(0, Custom(1))` | System program | ResultWithNegativeLamports (`native`) |
 | 7 | nested CPI, callee error | `InstructionError(0, Custom(6000))` | fail_callee | CalleeAlwaysFails (`anchor_log`) |
+| 8 | CPI to SPL Token, empty account | `InstructionError(1, Custom(1))` | SPL Token | InsufficientFunds (`native`) |
 
-Rows 1 and 7 share the exact same transaction error, and rows 4a and 5 share the same variant. Telling them apart is the decoder's job.
+Rows 1 and 7 share the exact same transaction error, rows 6 and 8 share code 1 from different programs, and rows 4a and 5 share the same variant. Telling them apart is the decoder's job.
 
 ## Decoder coverage
 
-On the 12 hand-verified fixtures (`cargo run -p failscope-decoder --example decode_fixtures`): anchor_log 5, runtime 4, idl 1, native 1, unknown 1. The unknown one is a mainnet program with no IDL that logs nothing.
+On the 13 hand-verified fixtures (`cargo run -p failscope-decoder --example decode_fixtures`): anchor_log 5, runtime 4, native 2, idl 1, unknown 1. The unknown one is a mainnet program with no IDL that logs nothing.
 
 On a 12-minute local run of `dev/traffic.sh` (140 failures through validator → Yellowstone → decode → Postgres): anchor_log 110, runtime 24, native 6, unknown 0. That traffic comes only from the companion programs, so it exercises the pipeline rather than measuring real-world coverage.
 
@@ -104,6 +105,10 @@ cargo run -p failscope-api -- ingest
 cargo run -p failscope-api -- serve     # dashboard + API on http://127.0.0.1:8080
 ALERT_WEBHOOK_URL=… cargo run -p failscope-api -- alert
 dev/traffic.sh 10                       # optional: 10 min of synthetic failures
+
+# or run ingest + serve (+ alert) in Docker instead of cargo run:
+docker compose --profile app up -d --build                     # dashboard on http://127.0.0.1:8080
+docker compose --profile app --profile alert up -d --build     # needs ALERT_WEBHOOK_URL in .env
 
 # off-chain workspace (DATABASE_URL enables the Postgres tests)
 cargo fmt --all --check

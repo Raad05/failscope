@@ -21,10 +21,11 @@ pub enum Case {
     Compute,
     CpiSystem,
     NestedCpi,
+    CpiToken,
 }
 
 impl Case {
-    pub const ALL: [Case; 8] = [
+    pub const ALL: [Case; 9] = [
         Case::Custom,
         Case::HasOne,
         Case::MissingSigner,
@@ -33,6 +34,7 @@ impl Case {
         Case::Compute,
         Case::CpiSystem,
         Case::NestedCpi,
+        Case::CpiToken,
     ];
 
     /// Stable name, used for fixture file names.
@@ -46,7 +48,43 @@ impl Case {
             Case::Compute => "compute_exhausted",
             Case::CpiSystem => "cpi_system_transfer",
             Case::NestedCpi => "nested_cpi_callee",
+            Case::CpiToken => "cpi_token_transfer",
         }
+    }
+}
+
+pub const TOKEN_PROGRAM_ID: Pubkey = fail_target::TOKEN_PROGRAM_ID;
+pub const ASSOCIATED_TOKEN_PROGRAM_ID: Pubkey =
+    Pubkey::from_str_const("ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL");
+/// Wrapped SOL: exists on every cluster, so the token case needs no mint setup.
+pub const NATIVE_MINT: Pubkey =
+    Pubkey::from_str_const("So11111111111111111111111111111111111111112");
+
+pub fn native_ata(owner: &Pubkey) -> Pubkey {
+    Pubkey::find_program_address(
+        &[
+            owner.as_ref(),
+            TOKEN_PROGRAM_ID.as_ref(),
+            NATIVE_MINT.as_ref(),
+        ],
+        &ASSOCIATED_TOKEN_PROGRAM_ID,
+    )
+    .0
+}
+
+/// `CreateIdempotent` (ATA instruction 1) for the owner's wrapped-SOL account.
+fn create_native_ata_ix(payer: &Pubkey) -> Instruction {
+    Instruction {
+        program_id: ASSOCIATED_TOKEN_PROGRAM_ID,
+        accounts: vec![
+            AccountMeta::new(*payer, true),
+            AccountMeta::new(native_ata(payer), false),
+            AccountMeta::new_readonly(*payer, false),
+            AccountMeta::new_readonly(NATIVE_MINT, false),
+            AccountMeta::new_readonly(system_program::ID, false),
+            AccountMeta::new_readonly(TOKEN_PROGRAM_ID, false),
+        ],
+        data: vec![1],
     }
 }
 
@@ -155,6 +193,20 @@ pub fn build(case: Case, payer: &Pubkey) -> Built {
             .to_account_metas(None),
             fail_target::instruction::FailNestedCpi {}.data(),
         )],
+        // The account is created in the same transaction (holding 0 tokens),
+        // so the case needs no setup; the failure rolls the creation back.
+        Case::CpiToken => vec![
+            create_native_ata_ix(payer),
+            target_ix(
+                fail_target::accounts::FailCpiToken {
+                    owner: *payer,
+                    source: native_ata(payer),
+                    token_program: TOKEN_PROGRAM_ID,
+                }
+                .to_account_metas(None),
+                fail_target::instruction::FailCpiToken {}.data(),
+            ),
+        ],
     };
     Built {
         instructions,

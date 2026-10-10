@@ -1,0 +1,9 @@
+# Only Cargo.toml, Cargo.lock and crates/ are copied; keep the context small.
+target
+onchain
+.local
+.git
+.env
+.claude
+fixtures
+docs

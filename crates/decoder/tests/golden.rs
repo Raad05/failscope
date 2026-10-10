@@ -17,7 +17,7 @@ fn fixtures_decode_to_expected() {
     let idls = common::fixture_idls();
     let fixtures = common::fixtures();
     assert!(
-        fixtures.len() >= 12,
+        fixtures.len() >= 13,
         "only {} fixtures found",
         fixtures.len()
     );

@@ -116,6 +116,10 @@ async fn main() -> anyhow::Result<()> {
             programs,
             dashboard_url,
         } => {
+            anyhow::ensure!(
+                !webhook_url.trim().is_empty(),
+                "ALERT_WEBHOOK_URL / --webhook-url is empty"
+            );
             anyhow::ensure!(window_minutes >= 1, "--window-minutes must be at least 1");
             anyhow::ensure!(
                 baseline_minutes >= window_minutes,

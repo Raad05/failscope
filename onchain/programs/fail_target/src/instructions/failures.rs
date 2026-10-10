@@ -4,6 +4,8 @@
 use std::hint::black_box;
 
 use anchor_lang::prelude::*;
+use anchor_lang::solana_program::instruction::{AccountMeta, Instruction};
+use anchor_lang::solana_program::program::invoke;
 use anchor_lang::system_program::{self, Transfer};
 use fail_callee::program::FailCallee;
 
@@ -107,4 +109,41 @@ pub fn handle_fail_nested_cpi(ctx: Context<FailNestedCpi>) -> Result<()> {
             caller: ctx.accounts.payer.to_account_info(),
         },
     ))
+}
+
+/// SPL Token program. Hand-built CPI below, so no `anchor-spl` dependency.
+pub const TOKEN_PROGRAM_ID: Pubkey = pubkey!("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA");
+
+#[derive(Accounts)]
+pub struct FailCpiToken<'info> {
+    pub owner: Signer<'info>,
+    /// CHECK: a token account owned by `owner` holding fewer than 1 token;
+    /// validated by the Token program.
+    #[account(mut)]
+    pub source: UncheckedAccount<'info>,
+    /// CHECK: address-checked.
+    #[account(address = TOKEN_PROGRAM_ID)]
+    pub token_program: UncheckedAccount<'info>,
+}
+
+/// CPI into SPL Token: transfer 1 token from an empty account to itself.
+/// Token fails with its own `InsufficientFunds` (custom 1), the same code
+/// the System program uses for a different error.
+pub fn handle_fail_cpi_token(ctx: Context<FailCpiToken>) -> Result<()> {
+    let source = ctx.accounts.source.to_account_info();
+    let owner = ctx.accounts.owner.to_account_info();
+    // Token instruction 3 = Transfer { amount: u64 }.
+    let mut data = vec![3u8];
+    data.extend_from_slice(&1u64.to_le_bytes());
+    let ix = Instruction {
+        program_id: TOKEN_PROGRAM_ID,
+        accounts: vec![
+            AccountMeta::new(source.key(), false),
+            AccountMeta::new(source.key(), false),
+            AccountMeta::new_readonly(owner.key(), true),
+        ],
+        data,
+    };
+    invoke(&ix, &[source.clone(), source, owner])?;
+    Ok(())
 }

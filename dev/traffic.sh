@@ -13,7 +13,8 @@ cases=(custom_error custom_error custom_error custom_error
        overflow_checked overflow_checked overflow_checked
        has_one_violation has_one_violation
        nested_cpi_callee nested_cpi_callee
-       compute_exhausted cpi_system_transfer missing_signer overflow_panic)
+       compute_exhausted cpi_system_transfer cpi_token_transfer missing_signer
+       overflow_panic)
 bin="$root/onchain/target/debug/send_failures"
 (cd "$root/onchain" && cargo build -q -p fail_client --bin send_failures)
 sent=0

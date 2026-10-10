@@ -54,4 +54,8 @@ pub mod fail_target {
     pub fn fail_nested_cpi(ctx: Context<FailNestedCpi>) -> Result<()> {
         instructions::failures::handle_fail_nested_cpi(ctx)
     }
+
+    pub fn fail_cpi_token(ctx: Context<FailCpiToken>) -> Result<()> {
+        instructions::failures::handle_fail_cpi_token(ctx)
+    }
 }

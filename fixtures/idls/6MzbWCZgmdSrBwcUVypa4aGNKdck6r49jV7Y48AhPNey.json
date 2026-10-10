@@ -57,6 +57,37 @@
       "args": []
     },
     {
+      "name": "fail_cpi_token",
+      "discriminator": [
+        33,
+        154,
+        86,
+        156,
+        40,
+        173,
+        240,
+        196
+      ],
+      "accounts": [
+        {
+          "name": "owner",
+          "signer": true
+        },
+        {
+          "name": "source",
+          "docs": [
+            "validated by the Token program."
+          ],
+          "writable": true
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "fail_custom",
       "discriminator": [
         57,
