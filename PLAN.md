@@ -2,6 +2,8 @@
 
 Working name: **failscope**. Rename freely.
 
+> **Status (2026-10-13):** M0–M9 are done, plus Docker packaging and live devnet streaming (Helius LaserStream). Mainnet deployment is planned (D24 revised). This file is the original plan, annotated as milestones were completed; the README and `docs/` describe the product as built. Possible next milestones are listed in [§11](#11-next).
+
 ## 1. Goal
 
 Stream Solana transactions via Yellowstone gRPC (Geyser), keep the ones that **failed on-chain**, decode *why* they failed (including custom Anchor errors, attributed to the correct program), store them, and expose an API plus a small dashboard.
@@ -164,9 +166,14 @@ Instructions that each fail deliberately in a distinct way:
 - Done when: you can point a screenshot at the README. (Done: `docs/dashboard.png`, D22.)
 
 ### M8: Stretch (pick one)
-- ~~Bot-likelihood heuristic (e.g. signer failure rate, tx frequency, tip patterns) with a documented, honest methodology.~~ Dropped (D24): only meaningful on real mainnet traffic.
+- Bot-likelihood heuristic (e.g. signer failure rate, tx frequency, tip patterns) with a documented, honest methodology. Dropped at first (D24, devnet-only scope), then built as M9 once mainnet was planned.
 - Alerting (webhook) on error spikes for a chosen program. **(Chosen and done: `failscope alert`, D23.)**
 - ClickHouse backend behind the store trait.
+
+### M9: Affected wallets and bot likelihood (done, D27)
+- Count distinct failing wallets per program, not just failures, and score each wallet's recent behaviour (rate, retry loops, Jito tips, fee outliers, unnamed errors) as likely bot / unclear / likely human, with stored reasons and raw features.
+- Alerts can count likely-human wallets instead of failures.
+- Done when: scores are explainable in the dashboard, a restart doesn't reset them, and tests cover bot, human and lag cases. Rules first; a fitted model only once labelled mainnet data exists.
 
 ## 6. Suggested crates (verify current versions)
 
@@ -188,7 +195,7 @@ tokio, tonic (via yellowstone), `yellowstone-grpc-client` and `yellowstone-grpc-
 ## 8. Cost and environment notes
 
 - Yellowstone access usually comes from a paid RPC provider (entry plans exist, but pricing changes, so check current plans) or a self-run node. For development, prefer **devnet** plus recorded fixtures so most of the work needs no streaming plan.
-- ~~Only buy mainnet streaming access when you reach M5 and want real data.~~ Scope decision (2026-10-10, D24): devnet and local validator only; no mainnet streaming.
+- ~~Only buy mainnet streaming access when you reach M5 and want real data.~~ Scope decision (2026-10-10, D24): devnet and local validator only. Revised 2026-10-13: build and test on devnet, deploy on mainnet later. Devnet streaming uses Helius LaserStream; mainnet gRPC is a paid tier.
 
 ## 9. README requirements (this is what hiring managers will read)
 
@@ -206,3 +213,14 @@ tokio, tonic (via yellowstone), `yellowstone-grpc-client` and `yellowstone-grpc-
 - Keep `decoder` free of network and DB dependencies.
 - After each milestone: run fmt, clippy, tests; summarize what changed and what is left.
 - When a spec detail is marked "verify", check current docs and note the finding in `docs/decisions.md`.
+
+## 11. Next
+
+Not started; roughly in order of value before a mainnet deployment.
+
+- **Mainnet readiness:** batched inserts and a throughput test, automatic retention, optional program filter on the subscription (docs/operations.md).
+- **Bot-score calibration:** hand-label a few hundred mainnet wallets, tune thresholds, then compare a fitted model against the rules (D27).
+- **Dashboard:** show active alerts (`/api/alerts` exists).
+- **Fixtures:** a real truncated-log transaction; an on-chain IDL in gzip or base58/base64 encoding.
+- **Optional:** ClickHouse backend behind the store traits, if Postgres can't keep up with mainnet volume.
+

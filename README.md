@@ -8,9 +8,37 @@ _Dashboard on live devnet (Helius LaserStream), one hour. The top program's thou
 
 **Status:** M0–M9 done (M8: webhook alerting, M9: affected wallets and bot scoring), plus Docker packaging. Built and tested on devnet; mainnet deployment is planned. Nothing streams from mainnet yet. The few mainnet transactions in `fixtures/` are static, read-only test data. See [PLAN.md](PLAN.md) for the roadmap and [docs/decisions.md](docs/decisions.md) for every design decision and verified runtime behaviour.
 
+## Quick start (devnet)
+
+Needs Docker and a devnet Yellowstone gRPC endpoint from a provider (the public devnet RPC has no gRPC; Helius LaserStream works).
+
+```sh
+git clone https://github.com/Raad05/failscope.git && cd failscope
+cp .env.example .env && chmod 600 .env
+# In .env:
+#   COMPOSE_YELLOWSTONE_ENDPOINT=https://<provider devnet gRPC URL>
+#   YELLOWSTONE_X_TOKEN=<your API key>
+#   COMPOSE_RPC_URL=<provider devnet RPC URL, or https://api.devnet.solana.com>
+#   INGEST_STREAM=devnet
+docker compose --profile app up -d --build
+docker compose logs -f ingest          # "progress cursor=Some(<slot>)" with inserted rising
+```
+
+Open http://127.0.0.1:8080. For alerts, set `ALERT_WEBHOOK_URL` (a Slack incoming webhook works) and add `--profile alert`. All settings: [docs/configuration.md](docs/configuration.md). Running it for real (security, retention, backups, troubleshooting): [docs/operations.md](docs/operations.md). Without a provider, a local validator with the plugin works too: [dev/README.md](dev/README.md).
+
 ## Failed vs dropped
 
 failscope only sees transactions that **landed in a block** and then failed during execution (the fee was charged, the state changes were rolled back). Transactions that were **dropped** (never landed: expired blockhash, rejected in preflight, lost in forwarding) never reach Geyser, so they are invisible here. This is not a landing-rate tool.
+
+## Limits
+
+- **Dropped and never-landed transactions are invisible** (above). The same goes for errors rejected before a fee is charged (`BlockhashNotFound`, `AlreadyProcessed`, bad signatures): they never land.
+- **Only failures are streamed.** Failure rates per program and "a bot that mostly succeeds" can't be seen.
+- **Many errors can't be named.** A custom code needs an Anchor log line, a known native table or the program's IDL. On devnet only about 9% of failures got a name (see [coverage](#decoder-coverage)).
+- **Bot scores are estimates** from behaviour, with hand-set thresholds not yet calibrated on mainnet (D27).
+- **Truncated logs** limit attribution: when CPIs ran and the logs are cut, the failing program is a guess and the error is left unnamed.
+- **Verified on devnet and a local validator.** Mainnet is planned, not tested; see [operations](docs/operations.md#running-on-mainnet-planned).
+- **The API has no authentication** and there is no automatic data retention yet ([operations](docs/operations.md)).
 
 ## Architecture
 
@@ -109,7 +137,21 @@ On the 14 hand-verified fixtures (`cargo run -p failscope-decoder --example deco
 
 On a 12-minute local run of `dev/traffic.sh` (140 failures through validator → Yellowstone → decode → Postgres): anchor_log 110, runtime 24, native 6, unknown 0. That traffic comes only from the companion programs, so it exercises the pipeline rather than measuring real-world coverage.
 
+On **live devnet** (Helius LaserStream, 24 minutes, 9,528 failures from 39 programs): unknown 91.1%, anchor_log 6.2%, runtime 1.4%, native 0.9%, idl 0.5%. Most devnet failures come from a few bots calling programs with no IDL that log nothing readable. The same window by wallet: 8 likely-bot wallets caused 90.5% of the failures, while 43 likely-human wallets caused 2.4%.
+
 Streaming devnet itself needs a hosted devnet Yellowstone endpoint, since the public devnet RPC has no gRPC. Tested with Helius LaserStream (`https://laserstream-devnet-ewr.helius-rpc.com`, API key as `YELLOWSTONE_X_TOKEN`): about 3 failures per second from every devnet program, with roughly 4 days of replay. Switching only changes `.env` (see [dev/README.md](dev/README.md)).
+
+## Documentation
+
+| Document | For |
+|---|---|
+| [docs/configuration.md](docs/configuration.md) | Every setting of `ingest`, `serve`, `alert`, bot scoring and compose |
+| [docs/operations.md](docs/operations.md) | Security, storage and retention, backups and upgrades, monitoring, troubleshooting |
+| [docs/api.md](docs/api.md) | HTTP API reference |
+| [docs/decisions.md](docs/decisions.md) | Design decisions (D1–D27) and verified runtime behaviour |
+| [dev/README.md](dev/README.md) | Local validator, building the Yellowstone plugin, end-to-end tests |
+| [fixtures/README.md](fixtures/README.md) | Recorded transactions and what each one tests |
+| [PLAN.md](PLAN.md) | Original plan and milestones |
 
 ## Development
 
