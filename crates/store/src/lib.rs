@@ -6,16 +6,17 @@
 use std::future::Future;
 
 use failscope_decoder::DecodedFailure;
+use failscope_score::{BotScore, Observation};
 use sqlx::postgres::{PgPool, PgPoolOptions};
 
 mod alerts;
 mod queries;
 
-pub use alerts::{AlertEvent, AlertState, AlertStore, NewAlertEvent};
+pub use alerts::{AlertEvent, AlertMetric, AlertState, AlertStore, NewAlertEvent};
 
 pub use queries::{
-    Bucket, CoveragePart, ErrorCount, FailureFilter, FailureRow, Page, Queries, TimeBucket,
-    TopProgram, MAX_LIMIT,
+    Bucket, CoveragePart, ErrorCount, FailureFilter, FailureRow, Page, Queries, SignerFilter,
+    SignerRow, SignerSummary, TimeBucket, TopProgram, MAX_LIMIT,
 };
 
 #[derive(Debug, thiserror::Error)]
@@ -33,9 +34,20 @@ pub enum StoreError {
 pub type Result<T> = std::result::Result<T, StoreError>;
 
 pub trait Store: Send + Sync {
-    /// Inserts a decoded failure. Returns false if the signature was already stored.
-    fn insert_failure(&self, failure: &DecodedFailure)
-        -> impl Future<Output = Result<bool>> + Send;
+    /// Inserts a decoded failure with its signer's bot score, if any.
+    /// Returns false if the signature was already stored.
+    fn insert_failure(
+        &self,
+        failure: &DecodedFailure,
+        bot: Option<&BotScore>,
+    ) -> impl Future<Output = Result<bool>> + Send;
+
+    /// Stored failures from `min_slot` on, oldest first, as the scoring
+    /// tracker sees them. Used to rebuild its windows after a restart.
+    fn recent_observations(
+        &self,
+        min_slot: u64,
+    ) -> impl Future<Output = Result<Vec<Observation>>> + Send;
 
     /// Fills `block_time` for rows of `slot` that don't have one yet.
     fn set_block_time(&self, slot: u64, unix_time: i64)
@@ -103,15 +115,24 @@ impl PgStore {
 }
 
 impl Store for PgStore {
-    async fn insert_failure(&self, f: &DecodedFailure) -> Result<bool> {
+    async fn insert_failure(&self, f: &DecodedFailure, bot: Option<&BotScore>) -> Result<bool> {
+        let features = bot
+            .map(|b| serde_json::to_value(&b.features))
+            .transpose()
+            .map_err(|e| StoreError::Serialize("bot_features", e))?;
+        let reasons: Option<Vec<&str>> =
+            bot.map(|b| b.reasons.iter().map(|r| r.as_str()).collect());
         let result = sqlx::query(
             "INSERT INTO failed_tx (
                 signature, slot, block_time, fee, priority_fee, cu_requested, cu_consumed,
                 signer, uses_alt, log_truncated, top_level_ix_index, root_program_id,
                 failing_program_id, cpi_depth, attribution_confidence, error_kind, error_code,
-                error_name, error_message, error_account, decode_source, raw_err)
+                error_name, error_message, error_account, decode_source, raw_err,
+                cu_price, cu_limit_explicit, jito_tip,
+                bot_score, bot_class, bot_reasons, bot_features)
              VALUES ($1, $2, to_timestamp($3), $4, $5, $6, $7, $8, $9, $10, $11, $12,
-                     $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)
+                     $13, $14, $15, $16, $17, $18, $19, $20, $21, $22,
+                     $23, $24, $25, $26, $27, $28, $29)
              ON CONFLICT (signature) DO NOTHING",
         )
         .bind(&f.signature)
@@ -143,9 +164,59 @@ impl Store for PgStore {
         .bind(&f.error_account)
         .bind(enum_text("decode_source", &f.decode_source)?)
         .bind(&f.raw_err)
+        // Prices are capped rather than rejected: only percentiles use them.
+        .bind(i64::try_from(f.cu_price).unwrap_or(i64::MAX))
+        .bind(f.cu_limit_explicit)
+        .bind(f.jito_tip)
+        .bind(bot.map(|b| i16::from(b.score)))
+        .bind(bot.map(|b| b.class.as_str()))
+        .bind(reasons)
+        .bind(features)
         .execute(&self.pool)
         .await?;
         Ok(result.rows_affected() == 1)
+    }
+
+    async fn recent_observations(&self, min_slot: u64) -> Result<Vec<Observation>> {
+        type Row = (
+            String,
+            String,
+            i64,
+            Option<String>,
+            String,
+            Option<i64>,
+            Option<String>,
+            Option<i64>,
+            Option<bool>,
+            String,
+        );
+        let rows: Vec<Row> = sqlx::query_as(
+            "SELECT signature, signer, slot, failing_program_id, error_kind, error_code,
+                    error_name, cu_price, jito_tip, decode_source
+             FROM failed_tx
+             WHERE slot >= $1 AND signer IS NOT NULL
+             ORDER BY slot, signature",
+        )
+        .bind(to_i64("slot", min_slot)?)
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows
+            .into_iter()
+            .map(
+                |(signature, signer, slot, program, kind, code, name, price, tip, source)| {
+                    Observation {
+                        signature,
+                        signer,
+                        slot: u64::try_from(slot).unwrap_or(0),
+                        program,
+                        error_key: failscope_score::error_key(&kind, code, name.as_deref()),
+                        cu_price: price.and_then(|p| u64::try_from(p).ok()).unwrap_or(0),
+                        jito_tip: tip.unwrap_or(false),
+                        silent_program: source == "unknown",
+                    }
+                },
+            )
+            .collect())
     }
 
     async fn set_block_time(&self, slot: u64, unix_time: i64) -> Result<u64> {

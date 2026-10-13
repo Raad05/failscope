@@ -1,5 +1,5 @@
-//! Storage for the alerting loop: recent per-minute failure counts, and the
-//! log of alert state changes.
+//! Storage for the alerting loop: recent per-minute counts (failures, or
+//! likely-human signers), and the log of alert state changes.
 
 use std::collections::HashMap;
 use std::future::Future;
@@ -24,9 +24,32 @@ impl AlertState {
     }
 }
 
+/// What an alert counts per minute.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AlertMetric {
+    /// Failed transactions.
+    #[default]
+    Failures,
+    /// Distinct likely-human signers with a failure, per minute. Summed over
+    /// a window this counts signer-minutes: a person failing in two minutes
+    /// counts twice. Bots barely move it however often they fail.
+    HumanSigners,
+}
+
+impl AlertMetric {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            AlertMetric::Failures => "failures",
+            AlertMetric::HumanSigners => "human_signers",
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct NewAlertEvent {
     pub program_id: String,
+    pub metric: AlertMetric,
     pub state: AlertState,
     pub window_minutes: u32,
     pub current_count: u64,
@@ -38,6 +61,7 @@ pub struct NewAlertEvent {
 pub struct AlertEvent {
     pub id: i64,
     pub program_id: String,
+    pub metric: String,
     pub state: String,
     pub at: String,
     pub window_minutes: i32,
@@ -47,16 +71,20 @@ pub struct AlertEvent {
 }
 
 pub trait AlertStore: Send + Sync {
-    /// Failures per program per minute for the last `minutes` minutes.
+    /// `metric` per program per minute for the last `minutes` minutes.
     /// Index 0 is the current (partial) minute, index 1 the one before, ...
-    fn failures_per_minute(
+    fn per_minute(
         &self,
+        metric: AlertMetric,
         minutes: u32,
         programs: &[String],
     ) -> impl Future<Output = Result<HashMap<String, Vec<u64>>>> + Send;
 
-    /// Latest state per program that has ever alerted.
-    fn alert_states(&self) -> impl Future<Output = Result<HashMap<String, AlertState>>> + Send;
+    /// Latest state per program that has ever alerted on `metric`.
+    fn alert_states(
+        &self,
+        metric: AlertMetric,
+    ) -> impl Future<Output = Result<HashMap<String, AlertState>>> + Send;
 
     fn record_alert(&self, event: &NewAlertEvent) -> impl Future<Output = Result<()>> + Send;
 
@@ -69,27 +97,36 @@ pub trait AlertStore: Send + Sync {
 }
 
 impl AlertStore for PgStore {
-    async fn failures_per_minute(
+    async fn per_minute(
         &self,
+        metric: AlertMetric,
         minutes: u32,
         programs: &[String],
     ) -> Result<HashMap<String, Vec<u64>>> {
+        let (count, only) = match metric {
+            AlertMetric::Failures => ("count(*)", "TRUE"),
+            AlertMetric::HumanSigners => (
+                "count(DISTINCT signer)",
+                "bot_class = 'likely_human' AND signer IS NOT NULL",
+            ),
+        };
         // Minutes are counted back from now (age 0 = the current minute), so
         // windows slide with the clock instead of snapping to minute marks.
-        let rows: Vec<(String, i32, i64)> = sqlx::query_as(
+        let sql = format!(
             "SELECT failing_program_id,
                     floor(extract(epoch FROM now() - COALESCE(block_time, ingested_at)) / 60)::int AS age,
-                    count(*)
+                    {count}
              FROM failed_tx
-             WHERE failing_program_id IS NOT NULL
+             WHERE failing_program_id IS NOT NULL AND {only}
                AND COALESCE(block_time, ingested_at) > now() - make_interval(mins => $1)
                AND (cardinality($2::text[]) = 0 OR failing_program_id = ANY($2))
-             GROUP BY 1, 2",
-        )
-        .bind(minutes as i32)
-        .bind(programs)
-        .fetch_all(self.pool())
-        .await?;
+             GROUP BY 1, 2"
+        );
+        let rows: Vec<(String, i32, i64)> = sqlx::query_as(&sql)
+            .bind(minutes as i32)
+            .bind(programs)
+            .fetch_all(self.pool())
+            .await?;
 
         let len = minutes as usize;
         let mut out: HashMap<String, Vec<u64>> = HashMap::new();
@@ -106,11 +143,13 @@ impl AlertStore for PgStore {
         Ok(out)
     }
 
-    async fn alert_states(&self) -> Result<HashMap<String, AlertState>> {
+    async fn alert_states(&self, metric: AlertMetric) -> Result<HashMap<String, AlertState>> {
         let rows: Vec<(String, String)> = sqlx::query_as(
             "SELECT DISTINCT ON (program_id) program_id, state
-             FROM alert_events ORDER BY program_id, at DESC, id DESC",
+             FROM alert_events WHERE metric = $1
+             ORDER BY program_id, at DESC, id DESC",
         )
+        .bind(metric.as_str())
         .fetch_all(self.pool())
         .await?;
         Ok(rows
@@ -129,8 +168,9 @@ impl AlertStore for PgStore {
     async fn record_alert(&self, e: &NewAlertEvent) -> Result<()> {
         sqlx::query(
             "INSERT INTO alert_events
-                (program_id, state, window_minutes, current_count, baseline_per_window, threshold)
-             VALUES ($1, $2, $3, $4, $5, $6)",
+                (program_id, state, window_minutes, current_count, baseline_per_window,
+                 threshold, metric)
+             VALUES ($1, $2, $3, $4, $5, $6, $7)",
         )
         .bind(&e.program_id)
         .bind(e.state.as_str())
@@ -138,6 +178,7 @@ impl AlertStore for PgStore {
         .bind(crate::to_i64("current_count", e.current_count)?)
         .bind(e.baseline_per_window)
         .bind(e.threshold)
+        .bind(e.metric.as_str())
         .execute(self.pool())
         .await?;
         Ok(())
@@ -145,7 +186,7 @@ impl AlertStore for PgStore {
 
     async fn alert_events(&self, hours: u32, limit: u32) -> Result<Vec<AlertEvent>> {
         Ok(sqlx::query_as(
-            "SELECT id, program_id, state,
+            "SELECT id, program_id, metric, state,
                     to_char(at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"') AS at,
                     window_minutes, current_count, baseline_per_window, threshold
              FROM alert_events

@@ -20,6 +20,7 @@ failscope-alert = { path = "crates/alert" }
 failscope-decoder = { path = "crates/decoder" }
 failscope-idl = { path = "crates/idl" }
 failscope-ingest = { path = "crates/ingest" }
+failscope-score = { path = "crates/score" }
 failscope-store = { path = "crates/store" }
 flate2 = "1"
 futures = "0.3"

@@ -12,6 +12,7 @@ bincode.workspace = true
 bs58.workspace = true
 failscope-decoder.workspace = true
 failscope-idl.workspace = true
+failscope-score.workspace = true
 failscope-store.workspace = true
 futures.workspace = true
 thiserror.workspace = true

@@ -1,6 +1,7 @@
 //! Spike alerts on per-program failure rates, delivered by webhook.
 //!
-//! Every tick: count each program's failures per minute, evaluate the rule
+//! Every tick: count each program's failures (or, with
+//! [`AlertMetric::HumanSigners`], likely-human signers) per minute, evaluate the rule
 //! (see `rule`), and on a state change (firing / resolved) POST a webhook.
 //! The change is recorded only after the webhook accepted it, so a failed
 //! delivery is retried on the next tick instead of being lost.
@@ -13,6 +14,8 @@ use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use failscope_store::{AlertState, AlertStore, NewAlertEvent, Page, Queries};
+
+pub use failscope_store::AlertMetric;
 use serde::Serialize;
 
 pub use rule::{Action, Evaluation, Rule};
@@ -20,6 +23,7 @@ pub use rule::{Action, Evaluation, Rule};
 #[derive(Debug, Clone)]
 pub struct AlertConfig {
     pub rule: Rule,
+    pub metric: AlertMetric,
     /// Secret: never logged.
     pub webhook_url: String,
     pub interval: Duration,
@@ -50,6 +54,7 @@ pub struct TopError {
 pub struct WebhookPayload {
     pub source: &'static str,
     pub state: AlertState,
+    pub metric: AlertMetric,
     pub program_id: String,
     pub window_minutes: u32,
     pub current: u64,
@@ -82,6 +87,7 @@ where
         baseline = config.rule.baseline_minutes,
         factor = config.rule.factor,
         min_failures = config.rule.min_failures,
+        metric = config.metric.as_str(),
         programs = config.programs.len(),
         "alerting started"
     );
@@ -113,9 +119,9 @@ pub async fn tick<S: AlertStore + Queries>(
 ) -> Result<Vec<NewAlertEvent>, AlertError> {
     let rule = &config.rule;
     let counts = store
-        .failures_per_minute(rule.span_minutes(), &config.programs)
+        .per_minute(config.metric, rule.span_minutes(), &config.programs)
         .await?;
-    let states = store.alert_states().await?;
+    let states = store.alert_states(config.metric).await?;
 
     // Programs with recent failures, plus firing ones (which may now be at zero).
     let watched = |p: &String| config.programs.is_empty() || config.programs.contains(p);
@@ -141,6 +147,7 @@ pub async fn tick<S: AlertStore + Queries>(
         };
         let event = NewAlertEvent {
             program_id: program.clone(),
+            metric: config.metric,
             state,
             window_minutes: rule.window_minutes,
             current_count: evaluation.current,
@@ -206,20 +213,28 @@ async fn payload<S: Queries>(
         })
         .collect::<Vec<_>>()
         .join(", ");
+    let (what, unit) = match e.metric {
+        AlertMetric::Failures => ("failures", "failures"),
+        AlertMetric::HumanSigners => (
+            "failures hitting likely-human wallets",
+            "likely-human wallet-minutes",
+        ),
+    };
     let text = match e.state {
         AlertState::Firing => format!(
-            "failscope: failures spiking for {}: {} in the last {} min (baseline {:.1} per {} min, threshold {:.0}). Top errors: {}",
+            "failscope: {what} spiking for {}: {} {unit} in the last {} min (baseline {:.1} per {} min, threshold {:.0}). Top errors: {}",
             e.program_id, e.current_count, e.window_minutes, e.baseline_per_window, e.window_minutes, e.threshold,
             if top.is_empty() { "none decoded".to_string() } else { top },
         ),
         AlertState::Resolved => format!(
-            "failscope: resolved for {}: {} failures in the last {} min (threshold {:.0})",
+            "failscope: resolved for {}: {} {unit} in the last {} min (threshold {:.0})",
             e.program_id, e.current_count, e.window_minutes, e.threshold,
         ),
     };
     Ok(WebhookPayload {
         source: "failscope",
         state: e.state,
+        metric: e.metric,
         program_id: e.program_id.clone(),
         window_minutes: e.window_minutes,
         current: e.current_count,

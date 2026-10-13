@@ -19,7 +19,7 @@ mod rpc;
 
 pub use anchor_log::{parse_anchor_error, AnchorErrorLog};
 pub use compute::{compute_budget, ComputeBudget};
-pub use decode::{decode, Confidence, DecodeSource, DecodedFailure};
+pub use decode::{decode, Confidence, DecodeSource, DecodedFailure, JITO_TIP_ACCOUNTS};
 pub use idl::{ErrorLookup, IdlError, IdlErrorTable, NoIdls};
 pub use input::{CompiledInstruction, InnerInstruction, InnerInstructions, TxInput};
 pub use logs::{analyze_logs, FrameFailure, LogAnalysis};

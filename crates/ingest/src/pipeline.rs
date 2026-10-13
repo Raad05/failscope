@@ -9,6 +9,10 @@
 //! so every failure up to the cursor is stored. On reconnect we ask for
 //! `from_slot = cursor`. That slot is replayed again, and inserts are
 //! idempotent (signature primary key).
+//!
+//! The consumer also scores each failure's signer for bot likelihood
+//! (`failscope-score`). The scorer's windows are rebuilt from Postgres at
+//! startup, so a restart doesn't reset every signer to "new".
 
 use std::collections::HashMap;
 use std::future::Future;
@@ -19,6 +23,7 @@ use failscope_decoder::{decode, DecodeSource, DecodedFailure, TxInput};
 use failscope_idl::{
     detect_format, AccountSource, FetchStatus, Idl, IdlCache, IdlFormat, IdlLocation,
 };
+use failscope_score::{Observation, ScoreConfig, SignerTracker};
 use failscope_store::{IdlCacheRow, Store};
 use futures::{SinkExt, StreamExt};
 use tokio::sync::{mpsc, watch};
@@ -43,6 +48,7 @@ pub struct IngestConfig {
     pub cursor_flush_interval: Duration,
     pub backoff_min: Duration,
     pub backoff_max: Duration,
+    pub score: ScoreConfig,
 }
 
 impl IngestConfig {
@@ -55,6 +61,7 @@ impl IngestConfig {
             cursor_flush_interval: Duration::from_secs(2),
             backoff_min: Duration::from_millis(500),
             backoff_max: Duration::from_secs(30),
+            score: ScoreConfig::default(),
         }
     }
 }
@@ -105,7 +112,14 @@ where
 
     let seeded = seed_idls(store.as_ref(), &idls).await?;
     tracing::info!(seeded, "IDL cache loaded from store");
-    let consumer = tokio::spawn(consume(config.clone(), Arc::clone(&store), idls, rx));
+    let tracker = seed_tracker(&config, store.as_ref()).await?;
+    let consumer = tokio::spawn(consume(
+        config.clone(),
+        Arc::clone(&store),
+        idls,
+        tracker,
+        rx,
+    ));
     let producer = produce(config, store, tx, stop_rx);
 
     tokio::pin!(producer);
@@ -378,6 +392,7 @@ async fn consume<St: Store, S: AccountSource>(
     config: IngestConfig,
     store: Arc<St>,
     idls: Arc<IdlCache<S>>,
+    mut tracker: SignerTracker,
     mut events: mpsc::Receiver<Event>,
 ) -> Result<IngestStats, IngestError> {
     let mut stats = IngestStats::default();
@@ -393,13 +408,15 @@ async fn consume<St: Store, S: AccountSource>(
                     if let Some(program) = refreshed {
                         persist_idl(store.as_ref(), &idls, &program).await?;
                     }
-                    if store.insert_failure(&failure).await? {
+                    let bot = Observation::from_failure(&failure).and_then(|o| tracker.observe(&o));
+                    if store.insert_failure(&failure, bot.as_ref()).await? {
                         stats.inserted += 1;
                         tracing::debug!(
                             signature = %failure.signature,
                             program = ?failure.failing_program_id,
                             error = ?failure.error_name,
                             source = ?failure.decode_source,
+                            bot = ?bot.as_ref().map(|b| b.class),
                             "stored failure"
                         );
                     } else {
@@ -423,7 +440,7 @@ async fn consume<St: Store, S: AccountSource>(
         if last_flush.elapsed() >= config.cursor_flush_interval {
             flush_cursor(store.as_ref(), &config.stream, cursor, &mut saved).await?;
             last_flush = Instant::now();
-            tracing::info!(?cursor, ?stats, "progress");
+            tracing::info!(?cursor, ?stats, signers = tracker.signers(), "progress");
         }
     }
     flush_cursor(store.as_ref(), &config.stream, cursor, &mut saved).await?;
@@ -464,6 +481,29 @@ pub async fn decode_with_idls<S: AccountSource>(
         }
         _ => (first, None),
     }
+}
+
+/// A tracker whose windows hold the failures already stored for the slots
+/// just before the cursor, so scores continue where the last run left off.
+async fn seed_tracker<St: Store>(
+    config: &IngestConfig,
+    store: &St,
+) -> Result<SignerTracker, IngestError> {
+    let mut tracker = SignerTracker::new(config.score.clone());
+    if let Some(cursor) = store.cursor(&config.stream).await? {
+        let from = cursor.saturating_sub(config.score.window_slots);
+        let recent = store.recent_observations(from).await?;
+        for obs in &recent {
+            tracker.observe(obs);
+        }
+        tracing::info!(
+            failures = recent.len(),
+            signers = tracker.signers(),
+            from_slot = from,
+            "bot scorer seeded from store"
+        );
+    }
+    Ok(tracker)
 }
 
 /// Loads persisted IDL lookups into the cache, keeping their original age.

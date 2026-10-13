@@ -44,8 +44,9 @@ One directory per fixture:
 | `mainnet_jupiter_panic` | mainnet | Jupiter v6 (1) | ProgramPanicked | runtime | Real panic in a production program |
 | `mainnet_compute_exhausted` | mainnet | Jupiter v6 (2) | ComputeUnitsExceeded | runtime | CUs run out in a self-CPI. The outer frame logs a *different* reason (`Program failed to complete`) |
 | `mainnet_cpi_inner_custom` | mainnet | `HBVw6…` (2) | code 8, name unknown | unknown | Top-level program is Jupiter but the failure is in an inner, silent program with no IDL |
+| `mainnet_jito_tip_failure` | mainnet | `HNYQL…` (1) | code 265, name unknown | unknown | Arbitrage-style bot: its private program logs `edge=8 … tip_lam=2444` and fails; instruction 3 tips Jito 2,444 lamports. `jito_tip` must be true. Found via `getSignaturesForAddress` on a Jito tip account |
 
-All four mainnet fixtures are v0 transactions with address lookup tables. Account keys must be resolved through `meta.loadedAddresses`.
+All five mainnet fixtures are v0 transactions with address lookup tables. Account keys must be resolved through `meta.loadedAddresses`.
 
 ### `expected.json` fields
 
@@ -61,6 +62,8 @@ All four mainnet fixtures are v0 transactions with address lookup tables. Accoun
 | `decode_source` | `anchor_log`, `anchor_framework`, `idl`, `native`, `runtime` or `unknown` |
 | `attribution_confidence` | `high` when the log stack identifies the failing program, `low` when logs are missing or truncated |
 | `signer`, `uses_alt`, `log_truncated`, `cu_consumed`, `fee` | Copied from the transaction |
+| `cu_requested`, `cu_limit_explicit`, `cu_price` | From the compute-budget instructions; checked against an independent parse of the instruction data |
+| `jito_tip` | One of Jito's 8 tip accounts is among the account keys |
 
 Golden tests compare every field exactly, except `error_message`. That field is compared only when it is non-null, because the message text for `native` and `runtime` errors is a presentation choice made in M3.
 

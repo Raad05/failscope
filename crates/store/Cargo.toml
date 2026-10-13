@@ -9,6 +9,7 @@ publish = false
 
 [dependencies]
 failscope-decoder.workspace = true
+failscope-score.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 sqlx.workspace = true

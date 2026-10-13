@@ -1,4 +1,5 @@
-//! The API against a real Postgres, seeded with the 13 decoded fixtures.
+//! The API against a real Postgres, seeded with the 14 decoded fixtures,
+//! each scored for bot likelihood the way ingest does it.
 //!
 //! Needs `DATABASE_URL` (any database on the server; a fresh database is
 //! created per run). Skips without it unless `FAILSCOPE_REQUIRE_DB=1`.
@@ -14,6 +15,7 @@ use axum::body::Body;
 use axum::http::{Request, StatusCode};
 use failscope_api::http::router;
 use failscope_decoder::{decode, from_rpc_json, IdlErrorTable};
+use failscope_score::{Observation, ScoreConfig, SignerTracker};
 use failscope_store::{PgStore, Store};
 use http_body_util::BodyExt;
 use serde_json::Value;
@@ -42,13 +44,24 @@ async fn fresh_store() -> Option<(PgStore, PgStore, String)> {
         }
     };
     let admin = PgStore::connect(&url).await.unwrap();
-    // Leftovers from runs that crashed before cleanup.
+    // Leftovers from runs that crashed before cleanup. Only old ones: tests
+    // run in parallel, and a younger database belongs to a running test.
+    let hour_ago = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_nanos()
+        .saturating_sub(3_600_000_000_000);
     let stale: Vec<String> = sqlx::query_scalar(
         "SELECT datname FROM pg_database WHERE datname LIKE 'failscope_api_test_%'",
     )
     .fetch_all(admin.pool())
     .await
     .unwrap();
+    let stale = stale.into_iter().filter(|db| {
+        db.trim_start_matches("failscope_api_test_")
+            .parse::<u128>()
+            .is_ok_and(|created| created < hour_ago)
+    });
     for db in stale {
         let _ = sqlx::query(&format!("DROP DATABASE IF EXISTS {db} WITH (FORCE)"))
             .execute(admin.pool())
@@ -87,12 +100,14 @@ async fn seed(store: &PgStore) -> Vec<String> {
         .collect();
     dirs.sort();
     let mut signatures = Vec::new();
+    let mut tracker = SignerTracker::new(ScoreConfig::default());
     for (i, dir) in dirs.iter().enumerate() {
         let json: Value =
             serde_json::from_str(&fs::read_to_string(dir.join("tx.json")).unwrap()).unwrap();
         let mut failure = decode(&from_rpc_json(&json).unwrap(), &idls);
         failure.block_time = Some(now() - 60 - 7 * 60 * i as i64);
-        assert!(store.insert_failure(&failure).await.unwrap());
+        let bot = tracker.observe(&Observation::from_failure(&failure).unwrap());
+        assert!(store.insert_failure(&failure, bot.as_ref()).await.unwrap());
         signatures.push(failure.signature.clone());
     }
     let mut old = decode(
@@ -104,7 +119,7 @@ async fn seed(store: &PgStore) -> Vec<String> {
     );
     old.signature = "1".repeat(64);
     old.block_time = Some(now() - 48 * 3600);
-    assert!(store.insert_failure(&old).await.unwrap());
+    assert!(store.insert_failure(&old, None).await.unwrap());
     signatures
 }
 
@@ -145,7 +160,7 @@ async fn endpoints_against_seeded_database() {
         .collect();
     assert_eq!(&programs[..2], &[FAIL_TARGET, JUPITER]);
     assert_eq!(column(&top, "failures")[..2], [6, 3].map(Value::from));
-    assert_eq!(programs.len(), 6);
+    assert_eq!(programs.len(), 7);
     let week = get(&store, "/api/programs/top?hours=168").await;
     assert_eq!(
         week["data"][0]["failures"], 7,
@@ -182,7 +197,7 @@ async fn endpoints_against_seeded_database() {
 
     // Coverage matches the fixture decode table.
     let coverage = get(&store, "/api/coverage").await;
-    assert_eq!(coverage["total"], 13);
+    assert_eq!(coverage["total"], 14);
     let by_source: std::collections::HashMap<String, i64> = coverage["data"]
         .as_array()
         .unwrap()
@@ -198,7 +213,7 @@ async fn endpoints_against_seeded_database() {
     assert_eq!(by_source["runtime"], 4);
     assert_eq!(
         (by_source["idl"], by_source["native"], by_source["unknown"]),
-        (1, 2, 1)
+        (1, 2, 2)
     );
 
     // Time series: every failure lands in some bucket, empty buckets are zero.
@@ -209,7 +224,7 @@ async fn endpoints_against_seeded_database() {
         .iter()
         .map(|b| b["failures"].as_i64().unwrap())
         .collect();
-    assert_eq!(counts.iter().sum::<i64>(), 13);
+    assert_eq!(counts.iter().sum::<i64>(), 14);
     assert!(counts.len() >= 120 && counts.contains(&0));
     let jup_ts = get(
         &store,
@@ -238,6 +253,104 @@ async fn endpoints_against_seeded_database() {
     let one = get(&store, &format!("/api/failures/{}", signatures[0])).await;
     assert_eq!(one["signature"], signatures[0].as_str());
     assert!(one["block_time"].as_str().unwrap().ends_with('Z'));
+
+    drop(store);
+    sqlx::query(&format!("DROP DATABASE {name} WITH (FORCE)"))
+        .execute(admin.pool())
+        .await
+        .unwrap();
+}
+
+const BOT: &str = "Bot1111111111111111111111111111111111111111";
+const JITO_FIXTURE: &str =
+    "5e3JSFVMdWmryaSJUJd3SZ5GtsjKTcqTsJJ27hcxzcTm4yzzdRnkUHUZymBAZYXbB3h9ZSf5o6b19Z11LC61BJSB";
+
+/// Fixtures plus a scripted signer failing in 25 consecutive slots: the
+/// signer views must class it as a bot, and the fixtures' signers as human
+/// or unclear.
+#[tokio::test]
+async fn bot_scores_and_signer_views() {
+    let Some((admin, store, name)) = fresh_store().await else {
+        return;
+    };
+    seed(&store).await;
+    let fixture = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../fixtures/txs/devnet_custom_error/tx.json");
+    let template = decode(
+        &from_rpc_json(&serde_json::from_str(&fs::read_to_string(fixture).unwrap()).unwrap())
+            .unwrap(),
+        &failscope_decoder::NoIdls,
+    );
+    let mut tracker = SignerTracker::new(ScoreConfig::default());
+    let mut first_class = None;
+    for i in 0..25u64 {
+        let mut f = template.clone();
+        f.signature = format!("{}{:0>20}", "2".repeat(44), i);
+        f.signer = Some(BOT.to_string());
+        f.slot = 900_000_000 + i;
+        f.block_time = Some(now() - 30);
+        let bot = tracker
+            .observe(&Observation::from_failure(&f).unwrap())
+            .unwrap();
+        first_class.get_or_insert(bot.class);
+        assert!(store.insert_failure(&f, Some(&bot)).await.unwrap());
+    }
+    assert_eq!(
+        first_class,
+        Some(failscope_score::BotClass::LikelyHuman),
+        "the first failure can't look like a bot yet"
+    );
+    let store = Arc::new(store);
+
+    // Fixture signers: Dx7RPX (all 9 devnet), 4 distinct mainnet signers and
+    // the Jito-tipping one; plus the bot. 39 failures in the 24h window.
+    let summary = get(&store, "/api/signers/summary").await;
+    assert_eq!(summary["failures"], 14 + 25);
+    assert_eq!(summary["affected_signers"], 7);
+    assert_eq!(summary["likely_bot_signers"], 1);
+    assert_eq!(summary["unclear_signers"], 1, "the Jito tipper");
+    assert_eq!(summary["likely_human_signers"], 5);
+    assert_eq!(summary["unscored_signers"], 0);
+
+    // The bot is classed by its worst failure, despite the early lag.
+    let bots = get(&store, "/api/signers/top?bot_class=likely_bot").await;
+    assert_eq!(column(&bots, "signer"), [Value::from(BOT)]);
+    assert_eq!(bots["data"][0]["failures"], 25);
+    assert_eq!(
+        bots["data"][0]["bot_reasons"],
+        serde_json::json!(["high_rate", "retry_loop"])
+    );
+    let top = get(&store, "/api/signers/top?limit=2").await;
+    assert_eq!(column(&top, "signer")[0], Value::from(BOT));
+
+    // Per program: fail_target's failures now come mostly from the bot, but
+    // it affects just one human (the devnet sender) and one bot.
+    let programs = get(&store, "/api/programs/top").await;
+    let ft = programs["data"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|r| r["program_id"] == FAIL_TARGET)
+        .unwrap();
+    assert_eq!(ft["failures"], 6 + 25);
+    assert_eq!(ft["affected_signers"], 2);
+    assert_eq!(ft["likely_human_signers"], 1);
+    assert_eq!(ft["likely_bot_signers"], 1);
+
+    // Failure filters and detail.
+    let bot_rows = get(&store, &format!("/api/failures?signer={BOT}&limit=500")).await;
+    assert_eq!(bot_rows["data"].as_array().unwrap().len(), 25);
+    let as_bot = get(&store, "/api/failures?bot_class=likely_bot&limit=500").await;
+    assert!(column(&as_bot, "signer").iter().all(|s| s == BOT));
+    let jito = get(&store, &format!("/api/failures/{JITO_FIXTURE}")).await;
+    assert_eq!(jito["jito_tip"], true);
+    assert_eq!(jito["bot_class"], "unclear");
+    assert_eq!(jito["bot_score"], 30);
+    assert_eq!(
+        jito["bot_reasons"],
+        serde_json::json!(["jito_tip", "silent_program"])
+    );
+    assert_eq!(jito["bot_features"]["window_failures"], 1);
 
     drop(store);
     sqlx::query(&format!("DROP DATABASE {name} WITH (FORCE)"))

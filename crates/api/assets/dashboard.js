@@ -9,7 +9,7 @@ const SVG = "http://www.w3.org/2000/svg";
 const KNOWN = {
   "11111111111111111111111111111111": "System Program",
   "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA": "SPL Token",
-  "TokenzQdBNbLqP5VEhdkAS6EPFLC1PE9qPdWLZDGkNvEQ": "Token-2022",
+  "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb": "Token-2022",
   "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL": "Associated Token",
   "ComputeBudget111111111111111111111111111111": "Compute Budget",
   "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4": "Jupiter v6",
@@ -27,6 +27,23 @@ const SOURCE_LABEL = {
   runtime: "Runtime (panic, compute)",
   unknown: "Not decoded",
 };
+
+// Bot-likelihood classes and the signals behind them (see failscope-score).
+const CLASS_LABEL = {
+  likely_bot: "likely bot",
+  unclear: "unclear",
+  likely_human: "likely human",
+};
+const REASON_LABEL = {
+  high_rate: "many failures",
+  very_high_rate: "very many failures",
+  retry_loop: "retry loop",
+  jito_tip: "Jito tip",
+  fee_outlier: "high fee",
+  silent_program: "unnamed error",
+  low_activity: "few failures",
+};
+const classLabel = (c) => CLASS_LABEL[c] || "not scored";
 
 const state = { hours: 24, program: null, data: null, tables: new Set() };
 
@@ -256,6 +273,11 @@ function render() {
   document.getElementById("kpi-total").textContent = fmt.format(total);
   document.getElementById("kpi-programs").textContent = fmt.format(d.allPrograms.length);
   document.getElementById("kpi-decoded").textContent = total ? pct((total - unknown) / total) : "–";
+  const w = d.signers;
+  document.getElementById("kpi-wallets").textContent = fmt.format(w.affected_signers);
+  document.getElementById("kpi-wallets-note").textContent = w.affected_signers
+    ? `${fmt.format(w.likely_human_signers)} likely human · ${fmt.format(w.likely_bot_signers)} likely bot`
+    : "";
 
   renderTimeseries(d);
   renderTop(d);
@@ -307,9 +329,10 @@ function renderTop(d) {
   const rows = d.allPrograms.slice(0, 10);
   if (!rows.length) { emptyState(box, "No failing programs in this window"); return; }
   if (state.tables.has("top")) {
-    box.replaceChildren(table(["Program", "Failures", "Distinct errors", "Last seen"],
-      rows.map((p) => [programName(p.program_id), fmt.format(p.failures), fmt.format(p.distinct_errors), ago(p.last_seen)]),
-      [1, 2]));
+    box.replaceChildren(table(["Program", "Failures", "Wallets", "Likely human", "Likely bot", "Distinct errors", "Last seen"],
+      rows.map((p) => [programName(p.program_id), fmt.format(p.failures), fmt.format(p.affected_signers),
+        fmt.format(p.likely_human_signers), fmt.format(p.likely_bot_signers), fmt.format(p.distinct_errors), ago(p.last_seen)]),
+      [1, 2, 3, 4, 5]));
     return;
   }
   barList(box, rows.map((p) => ({
@@ -348,6 +371,7 @@ function renderDetail(d) {
     document.getElementById("detail-sub").textContent = "";
     emptyState(errors, "Select a program above");
     recent.replaceChildren();
+    document.getElementById("signers").replaceChildren();
     return;
   }
   document.getElementById("detail-title").textContent = programName(state.program);
@@ -364,11 +388,24 @@ function renderDetail(d) {
     ]), [1, 3]));
 
   if (!d.recent.data.length) emptyState(recent, "No failures in this window");
-  else recent.replaceChildren(table(["When", "Signature", "Error", "CPI depth"],
+  else recent.replaceChildren(table(["When", "Signature", "Error", "CPI depth", "Wallet"],
     d.recent.data.map((f) => {
       const sig = el("span", { class: "mono", title: f.signature, text: shortId(f.signature) });
-      return [ago(f.block_time), sig, f.error_name || f.error_kind, f.cpi_depth == null ? "?" : String(f.cpi_depth)];
+      return [ago(f.block_time), sig, f.error_name || f.error_kind, f.cpi_depth == null ? "?" : String(f.cpi_depth),
+        el("span", { class: "pill", text: classLabel(f.bot_class) })];
     }), [3]));
+
+  const signers = document.getElementById("signers");
+  if (!d.signers_top.data.length) emptyState(signers, "No wallets in this window");
+  else signers.replaceChildren(table(["Wallet", "Failures", "Class", "Score", "Why", "Last seen"],
+    d.signers_top.data.map((s) => [
+      el("span", { class: "mono", title: s.signer, text: shortId(s.signer) }),
+      fmt.format(s.failures),
+      el("span", { class: "pill", text: classLabel(s.bot_class) }),
+      s.bot_score == null ? "–" : String(s.bot_score),
+      el("span", { class: "reasons", text: (s.bot_reasons || []).map((r) => REASON_LABEL[r] || r).join(", ") || "–" }),
+      ago(s.last_seen),
+    ]), [1, 3]));
 }
 
 // ------------------------------------------------------------------ data
@@ -384,25 +421,27 @@ async function load() {
   status.textContent = "Loading…";
   const h = state.hours;
   try {
-    const [allPrograms, coverage, ts] = await Promise.all([
+    const [allPrograms, coverage, ts, signers] = await Promise.all([
       api(`/api/programs/top?hours=${h}&limit=500`),
       api(`/api/coverage?hours=${h}`),
       api(`/api/failures/timeseries?hours=${h}&bucket=${bucketFor(h)}`),
+      api(`/api/signers/summary?hours=${h}`),
     ]);
     const programs = allPrograms.data;
     if (!state.program || !programs.some((p) => p.program_id === state.program)) {
       state.program = programs.length ? programs[0].program_id : null;
     }
-    let programTs = null, errors = { data: [] }, recent = { data: [] };
+    let programTs = null, errors = { data: [] }, recent = { data: [] }, signersTop = { data: [] };
     if (state.program) {
       const p = encodeURIComponent(state.program);
-      [programTs, errors, recent] = await Promise.all([
+      [programTs, errors, recent, signersTop] = await Promise.all([
         api(`/api/failures/timeseries?hours=${h}&bucket=${bucketFor(h)}&program=${p}`),
         api(`/api/programs/${p}/errors?hours=${h}&limit=20`),
         api(`/api/failures?hours=${h}&program=${p}&limit=15`),
+        api(`/api/signers/top?hours=${h}&program=${p}&limit=10`),
       ]);
     }
-    state.data = { allPrograms: programs, coverage, ts, programTs, errors, recent };
+    state.data = { allPrograms: programs, coverage, ts, programTs, errors, recent, signers, signers_top: signersTop };
     saveHash();
     render();
     status.textContent = `Updated ${new Date().toLocaleTimeString()}`;

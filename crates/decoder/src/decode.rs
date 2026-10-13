@@ -47,6 +47,12 @@ pub struct DecodedFailure {
     pub priority_fee: u64,
     pub cu_requested: u32,
     pub cu_consumed: Option<u64>,
+    /// Micro-lamports per CU (`SetComputeUnitPrice`, 0 if none).
+    pub cu_price: u64,
+    pub cu_limit_explicit: bool,
+    /// One of Jito's tip accounts is among the transaction's accounts, i.e.
+    /// it was sent with a tip for a Jito block builder.
+    pub jito_tip: bool,
     /// Fee payer.
     pub signer: Option<String>,
     pub uses_alt: bool,
@@ -105,6 +111,19 @@ impl Naming {
     }
 }
 
+/// Jito's tip accounts (block engine `getTipAccounts`, checked 2026-10-13).
+/// The same eight on every Jito cluster.
+pub const JITO_TIP_ACCOUNTS: [&str; 8] = [
+    "96gYZGLnJYVFmbjzopPSU6QiEV5fGqZNyN9nmNhvrZU5",
+    "HFqU5x63VTqvQss8hp11i4wVV8bD44PvwucfZ2bU7gRe",
+    "Cw8CFyM9FkoMi7K7Crf6HNQqf4uEMzpKw6QNghXLvLkY",
+    "ADaUMid9yfUytqMBgopwjb2DTLSokTSzL1zt6iGPaS49",
+    "DfXygSm4jCyNCybVYYK6DwvWqjKee8pbDmJGcLWNDXjh",
+    "ADuUkR4vqLUMWXxW9gh6D6L8pMSawimctcNZ5pGwDcEt",
+    "DttWaMuVvTiduZRnguLF7jNxTgiMBZ1hyAumKUiL2KRL",
+    "3AVi9Tg9Uo68tJfuvoKvqKNWKkC5wPdSSdeBnizKZ6jT",
+];
+
 pub fn decode(tx: &TxInput, idls: &dyn ErrorLookup) -> DecodedFailure {
     let analysis = tx.logs.as_deref().map(analyze_logs).unwrap_or_default();
     let raw_err = serde_json::to_value(&tx.err).unwrap_or(serde_json::Value::Null);
@@ -158,6 +177,12 @@ pub fn decode(tx: &TxInput, idls: &dyn ErrorLookup) -> DecodedFailure {
         priority_fee: compute.priority_fee,
         cu_requested: compute.cu_requested,
         cu_consumed: tx.cu_consumed,
+        cu_price: compute.cu_price,
+        cu_limit_explicit: compute.cu_limit_explicit,
+        jito_tip: tx
+            .account_keys
+            .iter()
+            .any(|k| JITO_TIP_ACCOUNTS.contains(&k.as_str())),
         signer: tx.account_keys.first().cloned(),
         uses_alt: tx.uses_alt,
         log_truncated: analysis.truncated,

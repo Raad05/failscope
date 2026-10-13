@@ -540,6 +540,7 @@ version = "0.1.0"
 dependencies = [
  "axum",
  "failscope-decoder",
+ "failscope-score",
  "failscope-store",
  "reqwest",
  "serde",
@@ -562,6 +563,7 @@ dependencies = [
  "failscope-decoder",
  "failscope-idl",
  "failscope-ingest",
+ "failscope-score",
  "failscope-store",
  "http-body-util",
  "serde",
@@ -612,6 +614,7 @@ dependencies = [
  "bs58",
  "failscope-decoder",
  "failscope-idl",
+ "failscope-score",
  "failscope-store",
  "futures",
  "reqwest",
@@ -624,10 +627,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "failscope-score"
+version = "0.1.0"
+dependencies = [
+ "failscope-decoder",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "failscope-store"
 version = "0.1.0"
 dependencies = [
  "failscope-decoder",
+ "failscope-score",
  "serde",
  "serde_json",
  "sqlx",

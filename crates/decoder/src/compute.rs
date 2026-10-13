@@ -21,6 +21,8 @@ pub struct ComputeBudget {
     pub cu_price: u64,
     /// `ceil(cu_price * cu_requested / 1e6)` lamports.
     pub priority_fee: u64,
+    /// The transaction set its own limit with `SetComputeUnitLimit`.
+    pub cu_limit_explicit: bool,
 }
 
 pub fn compute_budget(tx: &TxInput) -> ComputeBudget {
@@ -66,6 +68,7 @@ pub fn compute_budget(tx: &TxInput) -> ComputeBudget {
         cu_requested,
         cu_price,
         priority_fee: priority_fee(cu_price, cu_requested),
+        cu_limit_explicit: explicit_limit.is_some(),
     }
 }
 

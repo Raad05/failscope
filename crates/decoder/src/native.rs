@@ -5,7 +5,7 @@ use crate::native_tables::{ANCHOR_FRAMEWORK, ASSOCIATED_TOKEN, SYSTEM, TOKEN, TO
 
 pub const SYSTEM_PROGRAM: &str = "11111111111111111111111111111111";
 pub const TOKEN_PROGRAM: &str = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
-pub const TOKEN_2022_PROGRAM: &str = "TokenzQdBNbLqP5VEhdkAS6EPFLC1PE9qPdWLZDGkNvEQ";
+pub const TOKEN_2022_PROGRAM: &str = "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb";
 pub const ASSOCIATED_TOKEN_PROGRAM: &str = "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL";
 pub const COMPUTE_BUDGET_PROGRAM: &str = "ComputeBudget111111111111111111111111111111";
 
@@ -82,6 +82,27 @@ mod tests {
         }
         assert!(native_error(TOKEN_PROGRAM, 20).is_none());
         assert!(native_error(TOKEN_2022_PROGRAM, 20).is_some());
+    }
+
+    /// Addresses as declared upstream (`declare_id!` in solana-sdk-ids,
+    /// spl-token-interface, spl-token-2022-interface, ATA interface). A typo
+    /// here silently disables a table, since tests above use the constants.
+    #[test]
+    fn program_ids_match_upstream() {
+        assert_eq!(
+            TOKEN_2022_PROGRAM,
+            "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"
+        );
+        assert_eq!(TOKEN_PROGRAM, "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA");
+        assert_eq!(
+            ASSOCIATED_TOKEN_PROGRAM,
+            "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
+        );
+        assert_eq!(SYSTEM_PROGRAM, "11111111111111111111111111111111");
+        assert_eq!(
+            COMPUTE_BUDGET_PROGRAM,
+            "ComputeBudget111111111111111111111111111111"
+        );
     }
 
     #[test]

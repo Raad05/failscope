@@ -1,0 +1,18 @@
+[package]
+name = "failscope-score"
+description = "Pure bot-likelihood scoring of failing signers. No I/O."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+failscope-decoder.workspace = true
+serde.workspace = true
+
+[dev-dependencies]
+serde_json.workspace = true
+
+[lints]
+workspace = true

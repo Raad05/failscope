@@ -11,8 +11,9 @@ use axum::extract::State;
 use axum::http::StatusCode;
 use axum::routing::post;
 use axum::{Json, Router};
-use failscope_alert::{tick, AlertConfig, Rule};
+use failscope_alert::{tick, AlertConfig, AlertMetric, Rule};
 use failscope_decoder::{Confidence, DecodeSource, DecodedFailure};
+use failscope_score::BotClass;
 use failscope_store::{AlertState, AlertStore, PgStore, Store};
 
 const SPIKY: &str = "SpikyProgram1111111111111111111111111111111";
@@ -88,6 +89,9 @@ async fn seed(store: &PgStore, program: &str, ages: std::ops::Range<i64>, per_mi
                 priority_fee: 0,
                 cu_requested: 200_000,
                 cu_consumed: None,
+                cu_price: 0,
+                cu_limit_explicit: false,
+                jito_tip: false,
                 signer: None,
                 uses_alt: false,
                 log_truncated: false,
@@ -104,7 +108,7 @@ async fn seed(store: &PgStore, program: &str, ages: std::ops::Range<i64>, per_mi
                 decode_source: DecodeSource::Idl,
                 raw_err: serde_json::json!({}),
             };
-            store.insert_failure(&f).await.unwrap();
+            store.insert_failure(&f, None).await.unwrap();
         }
     }
 }
@@ -124,6 +128,7 @@ async fn fires_once_retries_failed_delivery_and_resolves() {
     let (receiver, url) = start_receiver().await;
     let config = AlertConfig {
         rule: Rule::default(),
+        metric: AlertMetric::Failures,
         webhook_url: url,
         interval: Duration::from_secs(60),
         programs: vec![],
@@ -135,7 +140,11 @@ async fn fires_once_retries_failed_delivery_and_resolves() {
     receiver.failing.store(true, Ordering::SeqCst);
     assert!(tick(&config, &store, &client).await.is_err());
     assert!(
-        store.alert_states().await.unwrap().is_empty(),
+        store
+            .alert_states(AlertMetric::Failures)
+            .await
+            .unwrap()
+            .is_empty(),
         "recorded an undelivered alert"
     );
 
@@ -178,7 +187,7 @@ async fn fires_once_retries_failed_delivery_and_resolves() {
     assert_eq!(events[0].state, AlertState::Resolved);
     assert_eq!(receiver.payloads.lock().unwrap()[1]["state"], "resolved");
     assert_eq!(
-        store.alert_states().await.unwrap()[SPIKY],
+        store.alert_states(AlertMetric::Failures).await.unwrap()[SPIKY],
         AlertState::Resolved
     );
     assert_eq!(store.alert_events(1, 10).await.unwrap().len(), 2);
@@ -193,6 +202,127 @@ async fn fires_once_retries_failed_delivery_and_resolves() {
         .await
         .unwrap()
         .is_empty());
+
+    drop(store);
+    sqlx::query(&format!("DROP DATABASE {name} WITH (FORCE)"))
+        .execute(admin.pool())
+        .await
+        .unwrap();
+}
+
+const HUMANS: &str = "HumansProgram111111111111111111111111111111";
+const BOTTY: &str = "BottyProgram1111111111111111111111111111111";
+
+/// One failure per signer in the current minute, stored with `class`.
+async fn seed_signers(store: &PgStore, program: &str, signers: &[String], class: BotClass) {
+    for (k, signer) in signers.iter().enumerate() {
+        let f = DecodedFailure {
+            signature: format!("{program}-{signer}-{k}"),
+            slot: 1,
+            block_time: Some(now() - 10),
+            fee: 5000,
+            priority_fee: 0,
+            cu_requested: 200_000,
+            cu_consumed: None,
+            cu_price: 0,
+            cu_limit_explicit: false,
+            jito_tip: false,
+            signer: Some(signer.clone()),
+            uses_alt: false,
+            log_truncated: false,
+            top_level_ix_index: Some(0),
+            root_program_id: Some(program.to_string()),
+            failing_program_id: Some(program.to_string()),
+            cpi_depth: Some(1),
+            attribution_confidence: Confidence::High,
+            error_kind: "custom".to_string(),
+            error_code: Some(6001),
+            error_name: Some("SlippageToleranceExceeded".to_string()),
+            error_message: None,
+            error_account: None,
+            decode_source: DecodeSource::Idl,
+            raw_err: serde_json::json!({}),
+        };
+        let bot = failscope_score::BotScore {
+            score: 0,
+            class,
+            reasons: vec![],
+            features: failscope_score::Features {
+                window_failures: 1,
+                window_slots: 1_500,
+                retry_run: 1,
+                tipped: false,
+                cu_price: 0,
+                fee_percentile: None,
+                silent_program: false,
+            },
+        };
+        store.insert_failure(&f, Some(&bot)).await.unwrap();
+    }
+}
+
+/// Counting likely-human signers: twelve people failing fires, one bot
+/// failing 200 times doesn't (it would on the plain failure count).
+#[tokio::test]
+async fn human_signer_metric_ignores_a_single_noisy_bot() {
+    let Some((admin, store, name)) = fresh_store().await else {
+        return;
+    };
+    let people: Vec<String> = (0..12).map(|i| format!("person{i}")).collect();
+    seed_signers(&store, HUMANS, &people, BotClass::LikelyHuman).await;
+    let bot: Vec<String> = (0..200).map(|_| "bot".to_string()).collect();
+    seed_signers(&store, BOTTY, &bot, BotClass::LikelyBot).await;
+
+    let (receiver, url) = start_receiver().await;
+    let humans = AlertConfig {
+        rule: Rule::default(),
+        metric: AlertMetric::HumanSigners,
+        webhook_url: url,
+        interval: Duration::from_secs(60),
+        programs: vec![],
+        dashboard_url: None,
+    };
+    let client = reqwest::Client::new();
+
+    let fired = tick(&humans, &store, &client).await.unwrap();
+    assert_eq!(
+        fired
+            .iter()
+            .map(|e| e.program_id.as_str())
+            .collect::<Vec<_>>(),
+        [HUMANS]
+    );
+    assert_eq!(fired[0].current_count, 12);
+    {
+        let payloads = receiver.payloads.lock().unwrap();
+        assert_eq!(payloads[0]["metric"], "human_signers");
+        assert!(payloads[0]["text"]
+            .as_str()
+            .unwrap()
+            .contains("likely-human wallet-minutes"));
+    }
+
+    // States are kept per metric: the failure count still alerts on the bot.
+    let failures = AlertConfig {
+        metric: AlertMetric::Failures,
+        ..humans.clone()
+    };
+    let fired = tick(&failures, &store, &client).await.unwrap();
+    let programs: Vec<&str> = fired.iter().map(|e| e.program_id.as_str()).collect();
+    assert!(programs.contains(&BOTTY), "{programs:?}");
+    assert_eq!(
+        store.alert_states(AlertMetric::HumanSigners).await.unwrap()[HUMANS],
+        AlertState::Firing
+    );
+    assert!(!store
+        .alert_states(AlertMetric::HumanSigners)
+        .await
+        .unwrap()
+        .contains_key(BOTTY));
+    let events = store.alert_events(1, 10).await.unwrap();
+    assert!(events
+        .iter()
+        .any(|e| e.program_id == HUMANS && e.metric == "human_signers"));
 
     drop(store);
     sqlx::query(&format!("DROP DATABASE {name} WITH (FORCE)"))

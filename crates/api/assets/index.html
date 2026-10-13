@@ -32,6 +32,7 @@
       <div class="tile"><div class="tile-label">Failed transactions</div><div class="tile-value" id="kpi-total">–</div></div>
       <div class="tile"><div class="tile-label">Programs with failures</div><div class="tile-value" id="kpi-programs">–</div></div>
       <div class="tile"><div class="tile-label">Decoded to a named error</div><div class="tile-value" id="kpi-decoded">–</div></div>
+      <div class="tile"><div class="tile-label">Wallets affected</div><div class="tile-value" id="kpi-wallets">–</div><div class="tile-note" id="kpi-wallets-note"></div></div>
     </section>
 
     <section class="card wide" aria-labelledby="ts-title">
@@ -87,6 +88,9 @@
           <div id="recent"></div>
         </div>
       </div>
+      <h3>Wallets with failures</h3>
+      <p class="card-sub">Each wallet is classed by its most bot-like failure. "Likely" means a score from behaviour, not proof.</p>
+      <div id="signers"></div>
     </section>
   </main>
 

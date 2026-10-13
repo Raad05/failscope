@@ -68,6 +68,9 @@ fn failure(signature: &str, slot: u64) -> DecodedFailure {
         priority_fee: 0,
         cu_requested: 200_000,
         cu_consumed: Some(1234),
+        cu_price: 0,
+        cu_limit_explicit: false,
+        jito_tip: false,
         signer: Some("payer".to_string()),
         uses_alt: false,
         log_truncated: false,
@@ -92,9 +95,15 @@ async fn insert_is_idempotent_and_round_trips() {
     let store = &db.store;
     let sig = unique("sig");
     let slot = 4_000_000_000;
-    assert!(store.insert_failure(&failure(&sig, slot)).await.unwrap());
+    assert!(store
+        .insert_failure(&failure(&sig, slot), None)
+        .await
+        .unwrap());
     assert!(
-        !store.insert_failure(&failure(&sig, slot)).await.unwrap(),
+        !store
+            .insert_failure(&failure(&sig, slot), None)
+            .await
+            .unwrap(),
         "duplicate inserted"
     );
 
@@ -126,11 +135,11 @@ async fn block_time_is_filled_once() {
             .as_micros()
             % 1_000_000) as u64;
     store
-        .insert_failure(&failure(&unique("a"), slot))
+        .insert_failure(&failure(&unique("a"), slot), None)
         .await
         .unwrap();
     store
-        .insert_failure(&failure(&unique("b"), slot))
+        .insert_failure(&failure(&unique("b"), slot), None)
         .await
         .unwrap();
     assert_eq!(store.set_block_time(slot, 1_790_000_000).await.unwrap(), 2);
@@ -217,5 +226,75 @@ async fn idl_cache_round_trips_and_keeps_age() {
         .unwrap();
     assert_eq!(got_missing.fetch_status, "missing");
     assert_eq!(got_missing.idl_json, None);
+    db.drop_db().await;
+}
+
+#[tokio::test]
+async fn bot_scores_round_trip_and_reseed_the_tracker() {
+    use failscope_score::{BotClass, Observation, Reason, ScoreConfig, SignerTracker};
+    let Some(db) = test_db().await else { return };
+    let store = &db.store;
+
+    let mut tracker = SignerTracker::new(ScoreConfig::default());
+    let mut f = failure("seed-1", 5_000);
+    f.cu_price = 42;
+    f.jito_tip = true;
+    let bot = tracker
+        .observe(&Observation::from_failure(&f).unwrap())
+        .unwrap();
+    assert!(store.insert_failure(&f, Some(&bot)).await.unwrap());
+    // One more by the same signer, and an old one outside any window.
+    store
+        .insert_failure(&failure("seed-2", 5_001), None)
+        .await
+        .unwrap();
+    store
+        .insert_failure(&failure("old", 10), None)
+        .await
+        .unwrap();
+
+    let (score, class, reasons, window): (i16, String, Vec<String>, i64) = sqlx::query_as(
+        "SELECT bot_score, bot_class, bot_reasons, (bot_features->>'window_failures')::bigint
+         FROM failed_tx WHERE signature = 'seed-1'",
+    )
+    .fetch_one(store.pool())
+    .await
+    .unwrap();
+    assert_eq!(i16::from(bot.score), score);
+    assert_eq!(class, bot.class.as_str());
+    assert_eq!(
+        reasons,
+        bot.reasons.iter().map(|r| r.as_str()).collect::<Vec<_>>()
+    );
+    assert_eq!(window, 1);
+    assert!(bot.reasons.contains(&Reason::JitoTip));
+    assert_eq!(
+        bot.class,
+        BotClass::from_score(bot.score, &ScoreConfig::default())
+    );
+
+    let recent = store.recent_observations(4_000).await.unwrap();
+    assert_eq!(
+        recent
+            .iter()
+            .map(|o| o.signature.as_str())
+            .collect::<Vec<_>>(),
+        ["seed-1", "seed-2"]
+    );
+    assert_eq!(recent[0].cu_price, 42);
+    assert!(recent[0].jito_tip);
+    assert!(!recent[1].jito_tip);
+    assert_eq!(recent[0].error_key, "AlwaysFails");
+
+    // A new tracker seeded from the store continues the signer's window.
+    let mut seeded = SignerTracker::new(ScoreConfig::default());
+    for o in &recent {
+        seeded.observe(o);
+    }
+    let next = seeded
+        .observe(&Observation::from_failure(&failure("seed-3", 5_002)).unwrap())
+        .unwrap();
+    assert_eq!(next.features.window_failures, 3);
+    assert!(next.features.tipped, "tip seen in the seeded window");
     db.drop_db().await;
 }

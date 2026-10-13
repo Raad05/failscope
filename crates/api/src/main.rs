@@ -33,6 +33,10 @@ enum Command {
         /// Cursor name, so several streams can share one database.
         #[arg(long, env = "INGEST_STREAM", default_value = "default")]
         stream: String,
+        /// JSON file overriding bot-scoring thresholds and weights (any
+        /// subset of failscope_score::ScoreConfig); defaults otherwise.
+        #[arg(long, env = "SCORE_CONFIG")]
+        score_config: Option<std::path::PathBuf>,
     },
     /// Watch per-program failure rates and POST a webhook when one spikes.
     Alert {
@@ -50,9 +54,13 @@ enum Command {
         /// Fire when the window count reaches this multiple of the baseline.
         #[arg(long, env = "ALERT_FACTOR", default_value_t = 3.0)]
         factor: f64,
-        /// Never fire below this many failures in the window.
+        /// Never fire below this count in the window.
         #[arg(long, env = "ALERT_MIN_FAILURES", default_value_t = 10)]
         min_failures: u64,
+        /// What to count per minute: `failures`, or `human-signers`
+        /// (distinct likely-human wallets with a failure).
+        #[arg(long, env = "ALERT_METRIC", value_enum, default_value_t = Metric::Failures)]
+        metric: Metric,
         #[arg(long, env = "ALERT_INTERVAL_SECS", default_value_t = 60)]
         interval_secs: u64,
         /// Programs to watch (repeat or comma-separate); default all.
@@ -69,6 +77,12 @@ enum Command {
         #[arg(long, env = "BIND", default_value = "127.0.0.1:8080")]
         bind: std::net::SocketAddr,
     },
+}
+
+#[derive(Debug, Clone, Copy, clap::ValueEnum)]
+enum Metric {
+    Failures,
+    HumanSigners,
 }
 
 #[tokio::main]
@@ -91,6 +105,7 @@ async fn main() -> anyhow::Result<()> {
             database_url,
             rpc_url,
             stream,
+            score_config,
         } => {
             let store = PgStore::connect(&database_url)
                 .await
@@ -99,6 +114,12 @@ async fn main() -> anyhow::Result<()> {
             let mut config = IngestConfig::new(endpoint);
             config.x_token = x_token.filter(|t| !t.is_empty());
             config.stream = stream;
+            if let Some(path) = score_config.filter(|p| !p.as_os_str().is_empty()) {
+                let text = std::fs::read_to_string(&path)
+                    .with_context(|| format!("reading {}", path.display()))?;
+                config.score = serde_json::from_str(&text)
+                    .with_context(|| format!("parsing {}", path.display()))?;
+            }
 
             let stats =
                 failscope_ingest::run(config, Arc::new(store), Arc::new(idls), shutdown_signal())
@@ -112,6 +133,7 @@ async fn main() -> anyhow::Result<()> {
             baseline_minutes,
             factor,
             min_failures,
+            metric,
             interval_secs,
             programs,
             dashboard_url,
@@ -137,6 +159,10 @@ async fn main() -> anyhow::Result<()> {
                     factor,
                     min_failures,
                     ..Default::default()
+                },
+                metric: match metric {
+                    Metric::Failures => failscope_alert::AlertMetric::Failures,
+                    Metric::HumanSigners => failscope_alert::AlertMetric::HumanSigners,
                 },
                 webhook_url,
                 interval: std::time::Duration::from_secs(interval_secs),

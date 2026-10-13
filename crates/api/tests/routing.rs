@@ -9,8 +9,9 @@ use axum::body::Body;
 use axum::http::{Request, StatusCode};
 use failscope_api::http::router;
 use failscope_store::{
-    AlertEvent, AlertState, AlertStore, Bucket, CoveragePart, ErrorCount, FailureFilter,
-    FailureRow, NewAlertEvent, Page, Queries, Result, TimeBucket, TopProgram,
+    AlertEvent, AlertMetric, AlertState, AlertStore, Bucket, CoveragePart, ErrorCount,
+    FailureFilter, FailureRow, NewAlertEvent, Page, Queries, Result, SignerFilter, SignerRow,
+    SignerSummary, TimeBucket, TopProgram,
 };
 use http_body_util::BodyExt;
 use std::collections::HashMap;
@@ -70,13 +71,39 @@ impl Queries for NoQueries {
         );
         Ok(None)
     }
+    async fn top_signers(&self, _: &SignerFilter, _: Page) -> Result<Vec<SignerRow>> {
+        assert!(
+            self.allow,
+            "query ran for a request that should have been rejected"
+        );
+        Ok(vec![])
+    }
+    async fn signer_summary(&self, _: u32, _: Option<&str>) -> Result<SignerSummary> {
+        assert!(
+            self.allow,
+            "query ran for a request that should have been rejected"
+        );
+        Ok(SignerSummary {
+            failures: 0,
+            affected_signers: 0,
+            likely_human_signers: 0,
+            unclear_signers: 0,
+            likely_bot_signers: 0,
+            unscored_signers: 0,
+        })
+    }
 }
 
 impl AlertStore for NoQueries {
-    async fn failures_per_minute(&self, _: u32, _: &[String]) -> Result<HashMap<String, Vec<u64>>> {
+    async fn per_minute(
+        &self,
+        _: AlertMetric,
+        _: u32,
+        _: &[String],
+    ) -> Result<HashMap<String, Vec<u64>>> {
         unreachable!("the API never evaluates alerts")
     }
-    async fn alert_states(&self) -> Result<HashMap<String, AlertState>> {
+    async fn alert_states(&self, _: AlertMetric) -> Result<HashMap<String, AlertState>> {
         unreachable!("the API never evaluates alerts")
     }
     async fn record_alert(&self, _: &NewAlertEvent) -> Result<()> {
@@ -122,6 +149,13 @@ async fn rejects_bad_parameters_before_querying() {
         "/api/coverage?hours=9999",
         "/api/alerts?hours=0",
         "/api/alerts?offset=5",
+        "/api/failures?bot_class=robot",
+        "/api/failures?signer=not-base58!",
+        "/api/signers/top?bot_class=bot",
+        "/api/signers/top?hours=0",
+        "/api/signers/top?program=short",
+        "/api/signers/summary?hours=721",
+        "/api/signers/summary?program=0OIl0OIl0OIl0OIl0OIl0OIl0OIl0OIl",
     ] {
         let (status, body) = get(false, uri).await;
         assert_eq!(status, StatusCode::BAD_REQUEST, "{uri}: {body}");
@@ -146,6 +180,9 @@ async fn defaults_and_envelope() {
         "/api/failures/timeseries?hours=48&bucket=day",
         "/api/coverage?hours=48",
         "/api/alerts?hours=48&limit=5",
+        "/api/failures?bot_class=likely_human&signer=Dx7RPXNY6qwLY7352Wh5NyatNTSwssmcFiN4Bphs14g2",
+        "/api/signers/top?hours=48&limit=5&offset=5&bot_class=likely_bot",
+        "/api/signers/summary?hours=48",
     ] {
         let (status, body) = get(true, uri).await;
         assert_eq!(status, StatusCode::OK, "{uri}: {body}");

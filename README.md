@@ -4,9 +4,9 @@
 
 ![failscope dashboard](docs/dashboard.png)
 
-_Dashboard during a local run: synthetic failures from the companion program (`dev/traffic.sh`), streamed through a local validator's Yellowstone plugin, decoded and stored. [Dark mode](docs/dashboard-dark.png)._
+_Dashboard on live devnet (Helius LaserStream), one hour. The top program's thousands of failures come from just two wallets, both scored as likely bots. [Dark mode](docs/dashboard-dark.png)._
 
-**Status:** M0–M8 done (M8: webhook alerting), plus Docker packaging. **Scope: devnet and a local validator only;** nothing streams from mainnet. The few mainnet transactions in `fixtures/` are static, read-only test data. See [PLAN.md](PLAN.md) for the roadmap and [docs/decisions.md](docs/decisions.md) for every design decision and verified runtime behaviour.
+**Status:** M0–M9 done (M8: webhook alerting, M9: affected wallets and bot scoring), plus Docker packaging. Built and tested on devnet; mainnet deployment is planned. Nothing streams from mainnet yet. The few mainnet transactions in `fixtures/` are static, read-only test data. See [PLAN.md](PLAN.md) for the roadmap and [docs/decisions.md](docs/decisions.md) for every design decision and verified runtime behaviour.
 
 ## Failed vs dropped
 
@@ -35,6 +35,7 @@ Three processes share one Postgres: `ingest` writes, `serve` and `alert` read. A
 | `crates/idl` | Fetches Anchor IDLs from both on-chain locations; TTL cache. |
 | `crates/ingest` | Yellowstone subscription, protobuf adapter, resume from cursor, gap tracking. |
 | `crates/store` | Storage traits and the Postgres implementation (migrations in `crates/store/migrations`). |
+| `crates/score` | Pure bot-likelihood scoring of failing wallets: sliding windows per signer, fixed points per signal. |
 | `crates/alert` | Spike detection and webhook delivery. |
 | `crates/api` | The `failscope` binary: `ingest`, `serve` (API + dashboard), `alert`. |
 | `onchain/` | Separate Anchor workspace: `fail_target` / `fail_callee`, programs that fail on purpose, plus their LiteSVM tests and devnet sender. |
@@ -67,6 +68,23 @@ Subscribes to failed, non-vote transactions at `confirmed` commitment, plus bloc
 - **`failscope serve`**: JSON API ([docs/api.md](docs/api.md)) and the dashboard at `/`, which is plain HTML/JS/SVG compiled into the binary and served with a strict CSP.
 - **`failscope alert`**: every minute, compares each program's failures in the last 5 minutes with its own average over the hour before. It fires when the count reaches `max(10, 3 × baseline)`, and resolves below 75% of that threshold, so it doesn't flap. A webhook is POSTed only on state changes, with a Slack-compatible `text` field. A state change is recorded only after the webhook accepts it, so a failed delivery is retried. All thresholds are flags. `dev/e2e-alert.sh` checks quiet → burst → fire → resolve on a live local stream.
 
+## Affected wallets, not just failures
+
+Most failed transactions on mainnet are bots' expected failures (arbitrage that wasn't profitable). A failure count can't tell "one bot retried 5,000 times" from "5,000 people couldn't swap", so failscope also counts **wallets** and scores each one for bot-like behaviour (`crates/score`, D27):
+
+| Signal (over ~10 min, 1500 slots) | Points |
+|---|---|
+| ≥ 20 failures / ≥ 100 failures | +35 / +20 more |
+| Same program + error, ≥ 5 attempts ≤ 3 slots apart | +25 |
+| Jito tip in the transaction | +20 |
+| Priority fee in the program's top 5% | +10 |
+| Error nobody can name (no IDL, no log) | +10 |
+| ≤ 3 failures, no tip, normal fee | −20 |
+
+≥ 60 is **likely bot**, < 30 **likely human**, in between **unclear**. The reasons and the raw features are stored with every failure, so the dashboard can say *why*, and a model can be fitted later on labelled data. Alerts can count likely-human wallets instead of failures (`ALERT_METRIC=human-signers`), so one noisy bot can't page anyone. It's a behavioural estimate, not proof; the thresholds will need calibrating on mainnet.
+
+On devnet, the first hour of scoring had ~9,600 failures from 67 wallets, and five wallets (all likely bots) produced ~7,700 of them.
+
 ## Companion program failure modes
 
 `onchain/` holds two Anchor programs deployed on devnet: `fail_target` (one instruction per failure mode) and `fail_callee` (fails inside a nested CPI). Signatures and explorer links are in [fixtures/README.md](fixtures/README.md).
@@ -87,7 +105,7 @@ Rows 1 and 7 share the exact same transaction error, rows 6 and 8 share code 1 f
 
 ## Decoder coverage
 
-On the 13 hand-verified fixtures (`cargo run -p failscope-decoder --example decode_fixtures`): anchor_log 5, runtime 4, native 2, idl 1, unknown 1. The unknown one is a mainnet program with no IDL that logs nothing.
+On the 14 hand-verified fixtures (`cargo run -p failscope-decoder --example decode_fixtures`): anchor_log 5, runtime 4, native 2, idl 1, unknown 2. The unknown ones are mainnet programs with no IDL that log nothing useful.
 
 On a 12-minute local run of `dev/traffic.sh` (140 failures through validator → Yellowstone → decode → Postgres): anchor_log 110, runtime 24, native 6, unknown 0. That traffic comes only from the companion programs, so it exercises the pipeline rather than measuring real-world coverage.
 

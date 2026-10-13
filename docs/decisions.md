@@ -106,7 +106,8 @@ Record each decision and each resolved "verify" item: what was decided, why, sou
 - The webhook URL is treated as a secret: from env, hidden in `--help`, and stripped from reqwest errors before logging.
 - Detection is a pure function (`crates/alert/src/rule.rs`), unit-tested. The loop is tested against real Postgres with a fake receiver (fire, no duplicate, retry after a failed delivery, resolve, program filter), and end to end on a live local stream (`dev/e2e-alert.sh`).
 
-### D24: Scope is devnet and a local validator; no mainnet (2026-10-10)
+### D24: Build and test on devnet; mainnet deployment planned (2026-10-10, revised 2026-10-13)
+- **Revised 2026-10-13:** the owner plans to deploy on mainnet later. Development and testing stay on devnet (Helius LaserStream devnet) and the local validator; features are designed for mainnet's volume and bot-heavy failure mix. Bot scoring (D27) is back in scope. The original decision follows.
 - Decided by the project owner. Nothing streams from or sends to mainnet. `send_failures` already refuses mainnet URLs.
 - The mainnet transactions and IDL accounts already in `fixtures/` stay. They are static, read-only test data (recorded once via public RPC) that cover real-world shapes the companion program can't produce (Jupiter's IDL-only slippage error, a silent inner program, legacy IDL locations).
 - Dropped: the bot-likelihood heuristic (needs real mainnet traffic) and mainnet coverage numbers. Coverage is reported on fixtures and on local runs instead. A hosted **devnet** Yellowstone endpoint remains possible later; it only changes `YELLOWSTONE_ENDPOINT`.
@@ -126,6 +127,20 @@ Record each decision and each resolved "verify" item: what was decided, why, sou
 - Each app service builds its own image tag. A shared `image:` tag made parallel builds fail with `image … already exists` under Docker Desktop's builder.
 - Endpoints are overridden with `COMPOSE_YELLOWSTONE_ENDPOINT` / `COMPOSE_RPC_URL`, separate from `.env`'s `YELLOWSTONE_ENDPOINT`/`RPC_URL`, so the same `.env` works for `cargo run` and for compose.
 - Migrations run on every process start (`PgStore::connect`); sqlx serializes concurrent runs with an advisory lock.
+
+### D27: Bot likelihood is scored per signer with fixed points, not a model (M9, 2026-10-13)
+- Most failed transactions on mainnet come from bots whose failures are expected (unprofitable arbitrage). Raw failure counts overstate how many people a program's failures affect, so failscope also counts **affected wallets** (distinct signers) and classes each wallet as likely bot / unclear / likely human.
+- **Scored unit:** the signer, over a sliding window of 1500 slots (~10 min). Slots, not wall time, so replay after an outage scores the same as live. Per-transaction facts (`cu_price`, `cu_limit_explicit`, `jito_tip`) come from the pure decoder; the window logic is the pure `failscope-score` crate, run inside ingest.
+- **Points (configurable, `SCORE_CONFIG` JSON):** ≥ 20 failures in the window +35; ≥ 100 another +20; same program + error in ≥ 5 attempts at most 3 slots apart +25; Jito tip anywhere in the window +20; `cu_price` at or above the program's 95th percentile (≥ 50 samples) +10; unnamed error (`decode_source = unknown`, typical of private trading programs) +10; ≤ 3 failures with no tip and no fee outlier −20. Clamped to 0–100; ≥ 60 likely bot, < 30 likely human.
+- **Why rules, not ML:** there are no labelled bot/human signers to train on, the strongest signals are simple thresholds, and every score must be explainable (reasons are stored). Raw features are stored per failure (`bot_features`), so a model (logistic regression first) can be fitted later on hand-labelled mainnet signers without re-ingesting.
+- **Known limits:**
+  - A bot's first failures score low until its rate builds up. Wallet views therefore class a signer by its most bot-like failure in the window.
+  - Only failures are seen, so a bot that mostly succeeds looks human.
+  - Shared fee payers (relayers) look like bots.
+  - The thresholds are guesses until calibrated on mainnet. On devnet, a wallet failing steadily ~6×/min for an hour only reaches "unclear", because the rate rules look at 10-minute windows.
+- **Jito tip detection:** one of the 8 tip accounts (from the block engine's `getTipAccounts`) appears among the transaction's account keys. Cheap and adapter-independent; the tip amount isn't extracted.
+- **Restart:** ingest rebuilds the tracker from the failures stored in the window before its cursor, so scores continue instead of resetting. Replayed duplicates are dropped by signature.
+- **Alerts** can count likely-human signers per minute instead of failures (`ALERT_METRIC=human-signers`). Summed over the alert window that is wallet-minutes, which one noisy bot barely moves. Alert state is tracked per metric.
 
 ## Runtime findings (observed, not assumed)
 
@@ -149,6 +164,8 @@ Observed on Agave 3.1.14 (LiteSVM 0.10 and devnet, identical logs):
 - **Yellowstone 12.1 `SubscribeReplayInfo.first_available` is `u64::MAX` until the plugin first prunes**, which happens once finalized > `10 + replay_stored_slots`. Until then every slot since server start *is* replayable. So `u64::MAX` means "nothing pruned yet", not "nothing stored". Reading it as "no replay" caused a bogus gap and skipped a resume that would have worked.
 - **Restarting `solana-test-validator` with its ledger kept loses nothing**: it replays the ledger from the start, and the plugin sees every transaction again. Real loss only happens once the replay window is exceeded.
 - **Yellowstone `TransactionError` is bincode** (`solana-storage.proto`, `bytes err`). It deserializes into the same `solana_transaction_error::TransactionError` the RPC JSON parses into. Checked on all 8 captured cases, where both adapters produce identical decoder input.
+- **Devnet, first hour of scoring (Helius LaserStream, 2026-10-13):** ~9,600 failures from 67 wallets. Five wallets, all scored 90 (very high rate, retry loop, unnamed errors), produced ~7,700 of them. The top failing program's 5,114 failures came from two wallets, both likely bots. Raw counts would have ranked it as the most broken program; by affected people it barely registers.
+- **Bug found in M9:** the decoder's Token-2022 program ID was mistyped since M3, so Token-2022 errors never matched the native table. Fixed, and a test now pins every native program ID to its upstream `declare_id!`.
 - Anchor 1.2 CPI codegen needs every `#[derive(Accounts)]` struct to take `'info`, so an empty `struct Foo {}` fails to compile under the `cpi` feature.
 
 ## To verify (resolve during the listed milestone)

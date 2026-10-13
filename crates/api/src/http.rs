@@ -10,7 +10,9 @@ use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use axum::routing::get;
 use axum::{Json, Router};
-use failscope_store::{AlertStore, FailureFilter, Page, Queries, TimeBucket, MAX_LIMIT};
+use failscope_store::{
+    AlertStore, FailureFilter, Page, Queries, SignerFilter, TimeBucket, MAX_LIMIT,
+};
 use serde::{Deserialize, Serialize};
 use tower_http::trace::TraceLayer;
 
@@ -34,6 +36,8 @@ pub fn router<Q: Queries + AlertStore + 'static>(queries: Arc<Q>) -> Router {
         .route("/api/failures/timeseries", get(timeseries::<Q>))
         .route("/api/failures/{signature}", get(failure::<Q>))
         .route("/api/coverage", get(coverage::<Q>))
+        .route("/api/signers/top", get(top_signers::<Q>))
+        .route("/api/signers/summary", get(signer_summary::<Q>))
         .route("/api/alerts", get(alerts::<Q>))
         .layer(TraceLayer::new_for_http())
         .with_state(queries)
@@ -237,6 +241,20 @@ pub struct FailureParams {
     pub offset: Option<u32>,
     pub program: Option<String>,
     pub error_name: Option<String>,
+    pub signer: Option<String>,
+    pub bot_class: Option<String>,
+}
+
+const BOT_CLASSES: [&str; 3] = ["likely_bot", "unclear", "likely_human"];
+
+fn check_bot_class(class: &Option<String>) -> Result<(), ApiError> {
+    match class {
+        Some(c) if !BOT_CLASSES.contains(&c.as_str()) => Err(ApiError::BadRequest(format!(
+            "bot_class must be one of {}",
+            BOT_CLASSES.join(", ")
+        ))),
+        _ => Ok(()),
+    }
 }
 
 async fn failures<Q: Queries>(
@@ -249,6 +267,10 @@ async fn failures<Q: Queries>(
     if p.error_name.as_ref().is_some_and(|n| n.len() > 128) {
         return Err(ApiError::BadRequest("error_name is too long".to_string()));
     }
+    if let Some(signer) = &p.signer {
+        check_base58("signer", signer, 32..=44)?;
+    }
+    check_bot_class(&p.bot_class)?;
     let window = WindowParams {
         hours: p.hours,
         limit: p.limit,
@@ -259,6 +281,8 @@ async fn failures<Q: Queries>(
         hours,
         program_id: p.program,
         error_name: p.error_name,
+        signer: p.signer,
+        bot_class: p.bot_class,
     };
     Ok(Json(Listing {
         data: q.failures(&filter, page).await?,
@@ -347,6 +371,72 @@ async fn coverage<Q: Queries>(
     Ok(Json(Coverage {
         total: data.iter().map(|c| c.failures).sum(),
         data,
+        window_hours: hours,
+    }))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct SignerParams {
+    pub hours: Option<u32>,
+    pub limit: Option<u32>,
+    pub offset: Option<u32>,
+    pub program: Option<String>,
+    pub bot_class: Option<String>,
+}
+
+async fn top_signers<Q: Queries>(
+    State(q): State<Arc<Q>>,
+    ApiQuery(p): ApiQuery<SignerParams>,
+) -> ApiResult<Listing<failscope_store::SignerRow>> {
+    if let Some(program) = &p.program {
+        check_program(program)?;
+    }
+    check_bot_class(&p.bot_class)?;
+    let window = WindowParams {
+        hours: p.hours,
+        limit: p.limit,
+        offset: p.offset,
+    };
+    let (hours, page) = (window.hours()?, window.page()?);
+    let filter = SignerFilter {
+        hours,
+        program_id: p.program,
+        bot_class: p.bot_class,
+    };
+    Ok(Json(Listing {
+        data: q.top_signers(&filter, page).await?,
+        page,
+        window_hours: hours,
+    }))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct SummaryParams {
+    pub hours: Option<u32>,
+    pub program: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct Summary {
+    #[serde(flatten)]
+    pub data: failscope_store::SignerSummary,
+    pub window_hours: u32,
+}
+
+async fn signer_summary<Q: Queries>(
+    State(q): State<Arc<Q>>,
+    ApiQuery(p): ApiQuery<SummaryParams>,
+) -> ApiResult<Summary> {
+    if let Some(program) = &p.program {
+        check_program(program)?;
+    }
+    let hours = WindowParams {
+        hours: p.hours,
+        ..Default::default()
+    }
+    .hours()?;
+    Ok(Json(Summary {
+        data: q.signer_summary(hours, p.program.as_deref()).await?,
         window_hours: hours,
     }))
 }

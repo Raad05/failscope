@@ -16,5 +16,8 @@
   "uses_alt": true,
   "log_truncated": false,
   "cu_consumed": 61107,
-  "fee": 5657
+  "fee": 5657,
+  "cu_limit_explicit": true,
+  "cu_price": 2506,
+  "jito_tip": false
 }
