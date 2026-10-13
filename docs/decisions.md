@@ -118,9 +118,12 @@ Record each decision and each resolved "verify" item: what was decided, why, sou
 - What it tests: code 1 again, from a different program than the System case; the transaction error points at instruction 1; and three *successful* Token frames at the same depth precede the failing one.
 - Deploying the larger program needed `solana program extend … 10240` first: `solana program deploy`'s auto-extend asked for less than the loader's 10 KiB minimum and failed.
 
-### D26: Docker packaging; ingest on host networking (2026-10-10)
+### D26: Docker packaging; how ingest reaches the host validator (2026-10-10, revised 2026-10-13)
 - One image (`Dockerfile`, multi-stage, non-root) with the `failscope` binary. `docker-compose.yml` keeps `db` as the only default service; `ingest` + `serve` are in profile `app`, `alert` in profile `alert` (it needs a webhook URL).
-- `ingest` uses `network_mode: host`. The local validator's Yellowstone plugin listens on `127.0.0.1:10000`, which a bridged container can't reach on Docker Engine (checked: `host.docker.internal` via `host-gateway` reached the RPC port, which binds all interfaces, but not gRPC). Making the plugin listen on all interfaces would expose an unauthenticated gRPC stream to the LAN. With host networking, ingest reaches Postgres on the published `127.0.0.1:5432`.
+- The local validator's Yellowstone plugin listens on `127.0.0.1:10000`. Making it listen on all interfaces would expose an unauthenticated gRPC stream to the LAN, so the containers have to reach the host's loopback instead.
+- Default (`docker-compose.yml`): ingest is bridged and uses `host.docker.internal` (with `host-gateway`). Checked on Docker Desktop for Linux: both RPC and gRPC are reachable. Docker Desktop is also what macOS users have.
+- Plain Docker Engine (Linux): `host.docker.internal` reaches the RPC port (which binds all interfaces) but not gRPC. `docker-compose.engine.yml` switches ingest to `network_mode: host`, reaching Postgres on the published `127.0.0.1:5432`. Host networking was the first default, but under Docker Desktop it means the VM's network, so ingest couldn't connect.
+- Each app service builds its own image tag. A shared `image:` tag made parallel builds fail with `image … already exists` under Docker Desktop's builder.
 - Endpoints are overridden with `COMPOSE_YELLOWSTONE_ENDPOINT` / `COMPOSE_RPC_URL`, separate from `.env`'s `YELLOWSTONE_ENDPOINT`/`RPC_URL`, so the same `.env` works for `cargo run` and for compose.
 - Migrations run on every process start (`PgStore::connect`); sqlx serializes concurrent runs with an advisory lock.
 

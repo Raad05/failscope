@@ -91,7 +91,7 @@ On the 13 hand-verified fixtures (`cargo run -p failscope-decoder --example deco
 
 On a 12-minute local run of `dev/traffic.sh` (140 failures through validator → Yellowstone → decode → Postgres): anchor_log 110, runtime 24, native 6, unknown 0. That traffic comes only from the companion programs, so it exercises the pipeline rather than measuring real-world coverage.
 
-Streaming devnet itself needs a hosted devnet Yellowstone endpoint, since the public devnet RPC has no gRPC. Switching only changes `YELLOWSTONE_ENDPOINT` (see [dev/README.md](dev/README.md)).
+Streaming devnet itself needs a hosted devnet Yellowstone endpoint, since the public devnet RPC has no gRPC. Tested with Helius LaserStream (`https://laserstream-devnet-ewr.helius-rpc.com`, API key as `YELLOWSTONE_X_TOKEN`): about 3 failures per second from every devnet program, with roughly 4 days of replay. Switching only changes `.env` (see [dev/README.md](dev/README.md)).
 
 ## Development
 
@@ -108,6 +108,7 @@ dev/traffic.sh 10                       # optional: 10 min of synthetic failures
 
 # or run ingest + serve (+ alert) in Docker instead of cargo run:
 docker compose --profile app up -d --build                     # dashboard on http://127.0.0.1:8080
+# plain Docker Engine (not Desktop): add -f docker-compose.yml -f docker-compose.engine.yml
 docker compose --profile app --profile alert up -d --build     # needs ALERT_WEBHOOK_URL in .env
 
 # off-chain workspace (DATABASE_URL enables the Postgres tests)

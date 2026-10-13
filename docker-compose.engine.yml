@@ -1,0 +1,13 @@
+# Plain Docker Engine (Linux) only. The local validator's gRPC port listens on
+# 127.0.0.1, which a bridged container can't reach there, so ingest shares the
+# host's network and reaches Postgres through the published 127.0.0.1:5432.
+# Not needed on Docker Desktop. See D26 in docs/decisions.md.
+#   docker compose -f docker-compose.yml -f docker-compose.engine.yml --profile app up -d --build
+services:
+  ingest:
+    network_mode: host
+    extra_hosts: !reset []
+    environment:
+      DATABASE_URL: postgres://failscope:failscope@127.0.0.1:5432/failscope
+      YELLOWSTONE_ENDPOINT: ${COMPOSE_YELLOWSTONE_ENDPOINT:-http://127.0.0.1:10000}
+      RPC_URL: ${COMPOSE_RPC_URL:-http://127.0.0.1:8899}

@@ -54,10 +54,16 @@ docker compose logs -f ingest
 docker compose --profile app down                 # stop (keeps the pgdata volume)
 ```
 
-`ingest` runs with host networking, because the plugin's gRPC port only
-listens on 127.0.0.1 (see D26 in `docs/decisions.md`). For a hosted devnet
-endpoint set `COMPOSE_YELLOWSTONE_ENDPOINT`, `COMPOSE_RPC_URL` and
-`YELLOWSTONE_X_TOKEN` in `.env`.
+`ingest` reaches the validator on the host as `host.docker.internal`, which
+works on Docker Desktop. On plain Docker Engine (Linux) the plugin's gRPC
+port (127.0.0.1 only) is unreachable that way; add the host-networking
+override: `docker compose -f docker-compose.yml -f docker-compose.engine.yml
+--profile app up -d --build` (see D26 in `docs/decisions.md`). For a hosted
+devnet endpoint set `COMPOSE_YELLOWSTONE_ENDPOINT`, `COMPOSE_RPC_URL` and
+`YELLOWSTONE_X_TOKEN` in `.env`, plus a new `INGEST_STREAM` (e.g. `devnet`) so
+it doesn't resume from a local cursor. Helius LaserStream devnet works:
+`https://laserstream-devnet-ewr.helius-rpc.com` with the API key as the token.
+`https://` endpoints use TLS with the system's root certificates.
 
 ## End-to-end checks
 

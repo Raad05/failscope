@@ -23,7 +23,7 @@ use failscope_store::{IdlCacheRow, Store};
 use futures::{SinkExt, StreamExt};
 use tokio::sync::{mpsc, watch};
 use tokio::time::{sleep, Instant};
-use yellowstone_grpc_client::GeyserGrpcClient;
+use yellowstone_grpc_client::{ClientTlsConfig, GeyserGrpcClient};
 use yellowstone_grpc_proto::prelude::{
     subscribe_update::UpdateOneof, CommitmentLevel, SubscribeRequest,
     SubscribeRequestFilterBlocksMeta, SubscribeRequestFilterTransactions, SubscribeRequestPing,
@@ -209,6 +209,19 @@ enum StreamError {
     Store(#[from] failscope_store::StoreError),
 }
 
+/// `e` plus its sources: tonic's top-level "transport error" alone hides
+/// whether DNS, TLS or the connection failed.
+fn error_chain(e: &dyn std::error::Error) -> String {
+    let mut out = e.to_string();
+    let mut source = e.source();
+    while let Some(s) = source {
+        out.push_str(": ");
+        out.push_str(&s.to_string());
+        source = s.source();
+    }
+    out
+}
+
 async fn stream_once<St: Store>(
     config: &IngestConfig,
     store: &St,
@@ -216,14 +229,21 @@ async fn stream_once<St: Store>(
     stop: &mut watch::Receiver<bool>,
     replay: &mut ReplayState,
 ) -> Result<StreamEnd, StreamError> {
-    let mut client = GeyserGrpcClient::build_from_shared(config.endpoint.clone())
+    let mut builder = GeyserGrpcClient::build_from_shared(config.endpoint.clone())
         .and_then(|b| b.x_token(config.x_token.clone()))
-        .map_err(|e| StreamError::Connect(e.to_string()))?
+        .map_err(|e| StreamError::Connect(e.to_string()))?;
+    // Hosted providers serve https; the local plugin serves plain http.
+    if config.endpoint.starts_with("https://") {
+        builder = builder
+            .tls_config(ClientTlsConfig::new().with_native_roots())
+            .map_err(|e| StreamError::Connect(e.to_string()))?;
+    }
+    let mut client = builder
         .connect_timeout(Duration::from_secs(10))
         .max_decoding_message_size(64 * 1024 * 1024)
         .connect()
         .await
-        .map_err(|e| StreamError::Connect(e.to_string()))?;
+        .map_err(|e| StreamError::Connect(error_chain(&e)))?;
 
     // Where to resume. The cursor slot itself is replayed (inserts are
     // idempotent). If the server can't go back that far, record the gap.
